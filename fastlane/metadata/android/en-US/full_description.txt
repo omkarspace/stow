@@ -11,3 +11,4 @@ Key Features:
 - Dynamic Parser Resilience: Auto-syncs extraction rules so saves keep working seamlessly.
 
 CleanSaver is an independent utility unaffiliated with Meta or Instagram. Users are responsible for respecting creator rights and fair-use guidelines.
+
