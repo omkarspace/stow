@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "min_app_version_code": 1,
+  "maintenance_mode": false,
+  "maintenance_message": "",
+  "config_ttl_hours": 24,
+  "user_agents": [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15"
+  ],
+  "url_patterns": {
+    "reel_regex": "^https?://(www\\.)?instagram\\.com/(reel|reels)/([A-Za-z0-9_-]{5,32})/?.*$",
+    "post_regex": "^https?://(www\\.)?instagram\\.com/(p|tv)/([A-Za-z0-9_-]{5,32})/?.*$",
+    "stories_regex": "^https?://(www\\.)?instagram\\.com/stories/.*$"
+  },
+  "strategies": [
+    {
+      "id": "embed_json_primary",
+      "type": "HTTP_EMBED",
+      "enabled": true,
+      "endpoint_template": "https://www.instagram.com/p/{shortcode}/embed/captioned/",
+      "video_regex": "\"video_url\":\"(https?:\\\\/\\\\/[^\"]+)\"",
+      "image_regex": "\"display_url\":\"(https?:\\\\/\\\\/[^\"]+)\"",
+      "json_script_selector": "script[type='text/javascript']",
+      "timeout_ms": 8000
+    },
+    {
+      "id": "webview_ephemeral_fallback",
+      "type": "WEBVIEW_EPHEMERAL",
+      "enabled": true,
+      "endpoint_template": "https://www.instagram.com/p/{shortcode}/",
+      "video_regex": "meta[property='og:video']",
+      "image_regex": "meta[property='og:image']",
+      "json_script_selector": "",
+      "timeout_ms": 10000
+    }
+  ]
+}

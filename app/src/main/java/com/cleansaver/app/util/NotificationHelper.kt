@@ -32,7 +32,7 @@ object NotificationHelper {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle("CleanSaver Downloading")
             .setContentText(progressText)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_notification)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
@@ -40,4 +40,3 @@ object NotificationHelper {
         return ForegroundInfo(NOTIFICATION_ID, notification)
     }
 }
-
