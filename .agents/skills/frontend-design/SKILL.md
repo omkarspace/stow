@@ -58,3 +58,4 @@ This skill provides an authoritative guide to crafting modern, premium, and huma
 - Use `Modifier.clip(RoundedCornerShape(...))` followed by `Modifier.background(...)` to prevent jagged edges.
 - Use `Coil` async image loading with a smooth crossfade and subtle placeholder shimmer.
 - Handle all empty, loading, error, and partial states gracefully with contextual illustrations and actions.
+
