@@ -24,6 +24,9 @@ import com.cleansaver.app.domain.usecase.DownloadMediaUseCase
 import com.cleansaver.app.domain.usecase.ExtractMediaUseCase
 import com.cleansaver.app.domain.usecase.RefreshConfigUseCase
 import com.cleansaver.app.domain.usecase.ValidateUrlUseCase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
@@ -31,6 +34,19 @@ import java.util.concurrent.TimeUnit
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "cleansaver_prefs")
 
 class AppContainer(private val context: Context) {
+
+    val applicationScope: CoroutineScope by lazy {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    }
+
+    val appVersionName: String by lazy {
+        try {
+            val info = context.packageManager.getPackageInfo(context.packageName, 0)
+            info.versionName ?: "1.0.0"
+        } catch (_: Exception) {
+            "1.0.0"
+        }
+    }
 
     val json: Json by lazy {
         Json {
@@ -94,16 +110,24 @@ class AppContainer(private val context: Context) {
         MediaStoreWriter(context, okHttpClient)
     }
 
+    val validateUrlUseCase: ValidateUrlUseCase by lazy {
+        ValidateUrlUseCase()
+    }
+
     val mediaRepository: MediaRepository by lazy {
-        MediaRepositoryImpl(mediaExtractorChain, mediaStoreWriter, downloadedMediaDao)
+        MediaRepositoryImpl(
+            context = context,
+            extractorChain = mediaExtractorChain,
+            mediaStoreWriter = mediaStoreWriter,
+            downloadedMediaDao = downloadedMediaDao,
+            okHttpClient = okHttpClient,
+            validateUrlUseCase = validateUrlUseCase,
+            applicationScope = applicationScope
+        )
     }
 
     val libraryRepository: LibraryRepository by lazy {
         LibraryRepositoryImpl(context, downloadedMediaDao)
-    }
-
-    val validateUrlUseCase: ValidateUrlUseCase by lazy {
-        ValidateUrlUseCase()
     }
 
     val extractMediaUseCase: ExtractMediaUseCase by lazy {
@@ -122,4 +146,3 @@ class AppContainer(private val context: Context) {
         CleanSaverWorkerFactory(mediaStoreWriter, downloadedMediaDao, json)
     }
 }
-

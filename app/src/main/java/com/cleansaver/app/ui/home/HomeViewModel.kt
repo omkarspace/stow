@@ -117,7 +117,9 @@ class HomeViewModel(
 
         viewModelScope.launch {
             if (!force) {
-                val anyDuplicate = candidatesToDownload.any { mediaRepository.isMediaAlreadyDownloaded(it.shortcode) }
+                val anyDuplicate = candidatesToDownload.any {
+                    mediaRepository.isMediaAlreadyDownloaded(it.shortcode, it.slideIndex)
+                }
                 if (anyDuplicate) {
                     _uiState.update { it.copy(showDuplicatePrompt = true) }
                     return@launch

@@ -21,6 +21,16 @@ class LibraryViewModel(
     private val _filterType = MutableStateFlow("ALL")
     private val _searchQuery = MutableStateFlow("")
 
+    init {
+        pruneStaleEntries()
+    }
+
+    fun pruneStaleEntries() {
+        viewModelScope.launch {
+            libraryRepository.pruneDeletedEntries()
+        }
+    }
+
     val uiState: StateFlow<LibraryUiState> = combine(
         libraryRepository.observeAllMedia(),
         _filterType,

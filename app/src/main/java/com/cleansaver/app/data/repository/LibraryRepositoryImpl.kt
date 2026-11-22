@@ -7,6 +7,7 @@ import com.cleansaver.app.data.local.DownloadedMediaEntity
 import com.cleansaver.app.domain.repository.LibraryRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 class LibraryRepositoryImpl(
@@ -44,5 +45,22 @@ class LibraryRepositoryImpl(
             Result.failure(e)
         }
     }
-}
 
+    override suspend fun pruneDeletedEntries() = withContext(Dispatchers.IO) {
+        try {
+            val allItems = downloadedMediaDao.observeAll().first()
+            for (item in allItems) {
+                if (item.mediaStoreUri.isBlank()) continue
+                val exists = try {
+                    context.contentResolver.openAssetFileDescriptor(Uri.parse(item.mediaStoreUri), "r")?.use { }
+                    true
+                } catch (_: Exception) {
+                    false
+                }
+                if (!exists) {
+                    downloadedMediaDao.deleteById(item.id)
+                }
+            }
+        } catch (_: Exception) {}
+    }
+}

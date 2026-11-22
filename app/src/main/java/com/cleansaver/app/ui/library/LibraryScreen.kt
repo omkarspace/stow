@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
@@ -44,6 +45,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -72,6 +74,10 @@ fun LibraryScreen(viewModel: LibraryViewModel) {
     val context = LocalContext.current
     var previewItem by remember { mutableStateOf<DownloadedMediaEntity?>(null) }
     var itemToDelete by remember { mutableStateOf<DownloadedMediaEntity?>(null) }
+
+    LaunchedEffect(Unit) {
+        viewModel.pruneStaleEntries()
+    }
 
     Column(
         modifier = Modifier
@@ -308,6 +314,25 @@ fun LibraryScreen(viewModel: LibraryViewModel) {
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.End
                                 ) {
+                                    if (item.sourceUrl.startsWith("http")) {
+                                        IconButton(
+                                            onClick = {
+                                                try {
+                                                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(item.sourceUrl))
+                                                    context.startActivity(browserIntent)
+                                                } catch (_: Exception) {}
+                                            },
+                                            modifier = Modifier.size(30.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.OpenInNew,
+                                                contentDescription = "Open original post",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                    }
                                     IconButton(
                                         onClick = {
                                             try {

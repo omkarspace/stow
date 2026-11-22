@@ -2,9 +2,12 @@ package com.cleansaver.app
 
 import android.app.Application
 import androidx.work.Configuration
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import coil.decode.VideoFrameDecoder
 import com.cleansaver.app.di.AppContainer
 
-class CleanSaverApplication : Application(), Configuration.Provider {
+class CleanSaverApplication : Application(), Configuration.Provider, ImageLoaderFactory {
 
     lateinit var container: AppContainer
         private set
@@ -18,5 +21,13 @@ class CleanSaverApplication : Application(), Configuration.Provider {
         get() = Configuration.Builder()
             .setWorkerFactory(container.workerFactory)
             .build()
-}
 
+    override fun newImageLoader(): ImageLoader {
+        return ImageLoader.Builder(this)
+            .components {
+                add(VideoFrameDecoder.Factory())
+            }
+            .crossfade(true)
+            .build()
+    }
+}

@@ -8,5 +8,5 @@ interface LibraryRepository {
     fun observeMediaByType(type: String): Flow<List<DownloadedMediaEntity>>
     suspend fun deleteMedia(id: Long, mediaStoreUri: String): Result<Unit>
     suspend fun clearHistory(): Result<Unit>
+    suspend fun pruneDeletedEntries()
 }
-

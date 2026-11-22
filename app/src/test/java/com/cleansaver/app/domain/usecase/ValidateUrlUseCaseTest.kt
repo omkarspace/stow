@@ -60,6 +60,7 @@ class ValidateUrlUseCaseTest {
         assertEquals("XyZ98765432", useCase("https://instagr.am/p/XyZ98765432/").getOrThrow().shortcode)
         assertEquals("TvCode12345", useCase("https://www.instagram.com/tv/TvCode12345/").getOrThrow().shortcode)
         assertEquals("ShArE123456", useCase("https://www.instagram.com/share/reel/ShArE123456/").getOrThrow().shortcode)
+        assertEquals("BA1234567890", useCase("https://www.instagram.com/share/BA1234567890/").getOrThrow().shortcode)
     }
 
     @Test

@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Videocam
@@ -525,25 +526,49 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                     color = successColor
                                                 )
                                             }
-                                            IconButton(
-                                                onClick = {
-                                                    try {
-                                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                                            type = if (candidate.mediaType == MediaType.VIDEO) "video/*" else "image/*"
-                                                            putExtra(Intent.EXTRA_STREAM, Uri.parse(progress.mediaStoreUri))
-                                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                                        }
-                                                        context.startActivity(Intent.createChooser(shareIntent, "Share Media"))
-                                                    } catch (_: Exception) {}
-                                                },
-                                                modifier = Modifier.size(32.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Share,
-                                                    contentDescription = "Share saved file",
-                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    modifier = Modifier.size(18.dp)
-                                                )
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                IconButton(
+                                                    onClick = {
+                                                        try {
+                                                            val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                                                                setDataAndType(
+                                                                    Uri.parse(progress.mediaStoreUri),
+                                                                    if (candidate.mediaType == MediaType.VIDEO) "video/*" else "image/*"
+                                                                )
+                                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                            }
+                                                            context.startActivity(viewIntent)
+                                                        } catch (_: Exception) {}
+                                                    },
+                                                    modifier = Modifier.size(32.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.OpenInNew,
+                                                        contentDescription = "Open in Gallery",
+                                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
+                                                IconButton(
+                                                    onClick = {
+                                                        try {
+                                                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                                type = if (candidate.mediaType == MediaType.VIDEO) "video/*" else "image/*"
+                                                                putExtra(Intent.EXTRA_STREAM, Uri.parse(progress.mediaStoreUri))
+                                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                            }
+                                                            context.startActivity(Intent.createChooser(shareIntent, "Share Media"))
+                                                        } catch (_: Exception) {}
+                                                    },
+                                                    modifier = Modifier.size(32.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Share,
+                                                        contentDescription = "Share saved file",
+                                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
                                             }
                                         }
                                     }

@@ -18,7 +18,8 @@ import kotlinx.coroutines.launch
 class SettingsViewModel(
     private val userPrefsRepository: UserPrefsRepository,
     private val remoteConfigRepository: RemoteConfigRepository,
-    private val libraryRepository: LibraryRepository
+    private val libraryRepository: LibraryRepository,
+    private val appVersionName: String
 ) : ViewModel() {
 
     private val _isRefreshing = MutableStateFlow(false)
@@ -39,12 +40,13 @@ class SettingsViewModel(
             isLoaded = true,
             isRefreshingConfig = refreshing,
             configRefreshMessage = msg,
-            configRefreshSuccess = _refreshSuccess.value
+            configRefreshSuccess = _refreshSuccess.value,
+            appVersion = appVersionName
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = SettingsUiState(isLoaded = false)
+        initialValue = SettingsUiState(isLoaded = false, appVersion = appVersionName)
     )
 
     fun setThemeMode(mode: String) {
@@ -94,7 +96,8 @@ class SettingsViewModel(
                     return SettingsViewModel(
                         userPrefsRepository = container.userPrefsRepository,
                         remoteConfigRepository = container.remoteConfigRepository,
-                        libraryRepository = container.libraryRepository
+                        libraryRepository = container.libraryRepository,
+                        appVersionName = container.appVersionName
                     ) as T
                 }
             }
