@@ -7,6 +7,7 @@ import com.cleansaver.app.di.AppContainer
 import com.cleansaver.app.domain.model.AppError
 import com.cleansaver.app.domain.model.CustomThrowable
 import com.cleansaver.app.domain.model.DownloadProgress
+import com.cleansaver.app.domain.repository.MediaRepository
 import com.cleansaver.app.domain.usecase.DownloadMediaUseCase
 import com.cleansaver.app.domain.usecase.ExtractMediaUseCase
 import com.cleansaver.app.domain.usecase.ValidateUrlUseCase
@@ -20,7 +21,8 @@ import kotlinx.coroutines.launch
 class HomeViewModel(
     private val validateUrlUseCase: ValidateUrlUseCase,
     private val extractMediaUseCase: ExtractMediaUseCase,
-    private val downloadMediaUseCase: DownloadMediaUseCase
+    private val downloadMediaUseCase: DownloadMediaUseCase,
+    private val mediaRepository: MediaRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -48,7 +50,8 @@ class HomeViewModel(
                     error = null,
                     extractedCandidates = emptyList(),
                     selectedIndices = emptySet(),
-                    downloadProgressMap = emptyMap()
+                    downloadProgressMap = emptyMap(),
+                    showDuplicatePrompt = false
                 )
             }
 
@@ -105,17 +108,30 @@ class HomeViewModel(
         }
     }
 
-    fun onDownload() {
+    fun onDownload(force: Boolean = false) {
         val candidates = _uiState.value.extractedCandidates
         val selected = _uiState.value.selectedIndices
         val candidatesToDownload = candidates.filterIndexed { index, _ -> selected.contains(index) }
         if (candidatesToDownload.isEmpty()) return
 
         viewModelScope.launch {
+            if (!force) {
+                val anyDuplicate = candidatesToDownload.any { mediaRepository.isMediaAlreadyDownloaded(it.shortcode) }
+                if (anyDuplicate) {
+                    _uiState.update { it.copy(showDuplicatePrompt = true) }
+                    return@launch
+                }
+            }
+
+            _uiState.update { it.copy(showDuplicatePrompt = false) }
             downloadMediaUseCase(candidatesToDownload).collect { progressMap ->
                 _uiState.update { it.copy(downloadProgressMap = progressMap) }
             }
         }
+    }
+
+    fun dismissDuplicatePrompt() {
+        _uiState.update { it.copy(showDuplicatePrompt = false) }
     }
 
     fun dismissError() {
@@ -130,7 +146,8 @@ class HomeViewModel(
                     return HomeViewModel(
                         validateUrlUseCase = container.validateUrlUseCase,
                         extractMediaUseCase = container.extractMediaUseCase,
-                        downloadMediaUseCase = container.downloadMediaUseCase
+                        downloadMediaUseCase = container.downloadMediaUseCase,
+                        mediaRepository = container.mediaRepository
                     ) as T
                 }
             }

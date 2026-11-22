@@ -48,3 +48,4 @@ class MediaStoreWriterNamingTest {
         assertEquals("image/jpeg", mimeType)
     }
 }
+

@@ -12,6 +12,7 @@ data class HomeUiState(
     val extractedCandidates: List<MediaCandidate> = emptyList(),
     val selectedIndices: Set<Int> = emptySet(),
     val downloadProgressMap: Map<Int, DownloadProgress> = emptyMap(),
+    val showDuplicatePrompt: Boolean = false,
     val error: AppError? = null
 )
 

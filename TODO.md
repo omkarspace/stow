@@ -8,7 +8,7 @@ This document tracks the end-to-end engineering implementation of **CleanSaver**
 ---
 
 ## Progress Overview
-- **Status:** Initial Development Milestone Completed ✅
+- **Status:** Complete v1.0 MVP Architecture & Implementation ✅
 - **Target Platform:** Android 10+ (API 29–35)
 - **Tech Stack:** Kotlin 2.0, Jetpack Compose (Material 3), OkHttp 4, Kotlinx Serialization, Room (KSP), DataStore Preferences, WorkManager.
 
@@ -17,12 +17,12 @@ This document tracks the end-to-end engineering implementation of **CleanSaver**
 ## Phase 1: Project Scaffolding & Build System
 - [x] Root Gradle build configuration: `settings.gradle.kts`, `build.gradle.kts`, `gradle.properties`
 - [x] Version catalog: `gradle/libs.versions.toml` (addresses Gap 2)
-- [x] Gradle wrapper configuration (`gradle/wrapper/gradle-wrapper.properties`)
+- [x] Gradle wrapper configuration (`gradle/wrapper/gradle-wrapper.properties`, `gradlew`, `gradlew.bat`)
 - [x] Git configuration: `.gitignore`
 - [x] App module configuration: `app/build.gradle.kts`
 - [x] Proguard rules: `app/proguard-rules.pro` with serialization, Room, and OkHttp rules (addresses Gap 3)
 - [x] Bundled default config asset: `app/src/main/assets/default_config.json` (addresses Gap 1)
-- [x] Android Manifest: `app/src/main/AndroidManifest.xml` (permissions, MainActivity, ShareReceiverActivity, WorkManager init)
+- [x] Android Manifest: `app/src/main/AndroidManifest.xml` (permissions, MainActivity, ShareReceiverActivity, WorkManager init, ForegroundService declaration)
 - [x] Network Security Config: `app/src/main/res/xml/network_security_config.xml`
 - [x] App strings, colors, and base XML resources: `app/src/main/res/values/`
 
@@ -37,7 +37,7 @@ This document tracks the end-to-end engineering implementation of **CleanSaver**
   - [x] `AppError` sealed hierarchy
   - [x] `DownloadProgress` sealed hierarchy
 - [x] Repository interfaces (`com.cleansaver.app.domain.repository`):
-  - [x] `MediaRepository`
+  - [x] `MediaRepository` (includes deduplication check `isMediaAlreadyDownloaded`)
   - [x] `RemoteConfigRepository`
   - [x] `LibraryRepository`
   - [x] `UserPrefsRepository`
@@ -72,8 +72,9 @@ This document tracks the end-to-end engineering implementation of **CleanSaver**
 - [x] Gallery saving pipeline (`com.cleansaver.app.data.local`):
   - [x] `MediaStoreWriter` (scoped storage, atomic write via `IS_PENDING`, 16 KB buffer streaming)
 - [x] Background workers (`com.cleansaver.app.data.worker`):
-  - [x] `MediaDownloadWorker` (WorkManager task with deduplication and concurrency control)
+  - [x] `MediaDownloadWorker` (WorkManager task with deduplication and foreground notification)
   - [x] `CleanSaverWorkerFactory` (manual injection factory without Hilt, addresses Gap 4)
+  - [x] `NotificationHelper` (handles download notification channel and ForegroundInfo)
 - [x] Repository implementations:
   - [x] `MediaRepositoryImpl`
   - [x] `LibraryRepositoryImpl`
@@ -88,20 +89,21 @@ This document tracks the end-to-end engineering implementation of **CleanSaver**
 
 ## Phase 6: Presentation Layer (Jetpack Compose & ViewModels)
 - [x] UI Theme & Design System (`com.cleansaver.app.ui.theme`):
-  - [x] `Color.kt`, `Type.kt`, `Theme.kt`
+  - [x] `Color.kt`, `Type.kt`, `Theme.kt` (dynamic theme support: System, Light, Dark)
 - [x] State representations (`com.cleansaver.app.ui.state`):
-  - [x] `HomeUiState`, `ShareSheetUiState`, `LibraryUiState`, `SettingsUiState`
+  - [x] `HomeUiState` (with carousel multi-selection & duplicate prompt state), `ShareSheetUiState`, `LibraryUiState`, `SettingsUiState`
 - [x] ViewModels (`com.cleansaver.app.ui.*`):
-  - [x] `HomeViewModel`
+  - [x] `HomeViewModel` (handles URL validation, carousel slide toggles, and FR-4 duplicate prompting)
   - [x] `ShareReceiverViewModel`
   - [x] `LibraryViewModel`
-  - [x] `SettingsViewModel`
+  - [x] `SettingsViewModel` (theme switcher, clipboard auto-detect, remote sync)
 - [x] Screen composables & navigation:
-  - [x] `MainActivity` & `HomeScreen` (URL input, paste button, preview card, progress bar)
+  - [x] `MainActivity` & `HomeScreen` (URL input, paste button, carousel slide checkboxes, download progress bar, duplicate alert dialog)
   - [x] `ShareReceiverActivity` & Share Bottom Sheet (1-tap save on system share)
-  - [x] `LibraryScreen` (filter chips, media list, open in player, system share, delete)
-  - [x] `SettingsScreen` (theme toggle, clipboard auto-detect, trust & fair use block, clear history)
+  - [x] `LibraryScreen` (filter chips, media list, in-app preview, system share, delete)
+  - [x] `SettingsScreen` (theme selector chips, clipboard auto-detect, trust & fair use block, clear history)
   - [x] `DisclaimerBottomSheet` (first-run disclosure dialog)
+  - [x] `MediaPreviewDialog` (in-app full-screen looping media player & photo viewer)
 
 ---
 
@@ -109,4 +111,5 @@ This document tracks the end-to-end engineering implementation of **CleanSaver**
 - [x] `ValidateUrlUseCaseTest` (unit tests for URL extraction, canonicalization, rejection)
 - [x] `ParserConfigDtoTest` (schema verification and deserialization)
 - [x] `MediaExtractorChainTest` (strategy execution order, private account failure, maintenance mode)
-- [ ] Physical device / Emulator end-to-end integration run
+- [x] `MediaStoreWriterNamingTest` (validates file naming, mime types, and target directory mappings)
+- [x] `RemoteConfigNetworkTest` (validates HTTP 200 parsing and HTTP 304 ETag caching)

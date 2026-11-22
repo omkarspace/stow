@@ -3,7 +3,6 @@ package com.cleansaver.app.ui.home
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +26,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -36,7 +36,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -282,7 +281,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
-                onClick = { viewModel.onDownload() },
+                onClick = { viewModel.onDownload(force = false) },
                 enabled = state.selectedIndices.isNotEmpty(),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -294,5 +293,24 @@ fun HomeScreen(viewModel: HomeViewModel) {
                 Text("Save Selected (${state.selectedIndices.size}) to Gallery")
             }
         }
+    }
+
+    // FR-4 Deduplication Confirmation Dialog
+    if (state.showDuplicatePrompt) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissDuplicatePrompt() },
+            title = { Text("Item Already Saved") },
+            text = { Text("Item already saved. Download again?") },
+            confirmButton = {
+                Button(onClick = { viewModel.onDownload(force = true) }) {
+                    Text("Download Again")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissDuplicatePrompt() }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }

@@ -8,5 +8,5 @@ import kotlinx.coroutines.flow.Flow
 interface MediaRepository {
     suspend fun extractMedia(parsedUrl: ParsedUrl): Result<List<MediaCandidate>>
     fun downloadCandidates(candidates: List<MediaCandidate>): Flow<Map<Int, DownloadProgress>>
+    suspend fun isMediaAlreadyDownloaded(shortcode: String): Boolean
 }
-

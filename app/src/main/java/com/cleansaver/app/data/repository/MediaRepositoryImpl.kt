@@ -9,8 +9,10 @@ import com.cleansaver.app.domain.model.DownloadProgress
 import com.cleansaver.app.domain.model.MediaCandidate
 import com.cleansaver.app.domain.model.ParsedUrl
 import com.cleansaver.app.domain.repository.MediaRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.withContext
 
 class MediaRepositoryImpl(
     private val extractorChain: MediaExtractorChain,
@@ -20,6 +22,10 @@ class MediaRepositoryImpl(
 
     override suspend fun extractMedia(parsedUrl: ParsedUrl): Result<List<MediaCandidate>> {
         return extractorChain.extract(parsedUrl)
+    }
+
+    override suspend fun isMediaAlreadyDownloaded(shortcode: String): Boolean = withContext(Dispatchers.IO) {
+        downloadedMediaDao.findExisting(shortcode, 0) != null
     }
 
     override fun downloadCandidates(candidates: List<MediaCandidate>): Flow<Map<Int, DownloadProgress>> = flow {
@@ -33,7 +39,6 @@ class MediaRepositoryImpl(
 
             val result = mediaStoreWriter.downloadToGallery(candidate) { bytesRead, totalBytes, percent ->
                 progressMap[index] = DownloadProgress.Running(bytesRead, totalBytes, percent)
-                // Note: we can throttle emits if needed
             }
 
             if (result.isSuccess) {
@@ -59,4 +64,3 @@ class MediaRepositoryImpl(
         }
     }
 }
-

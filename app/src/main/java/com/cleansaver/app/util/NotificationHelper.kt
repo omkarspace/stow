@@ -40,3 +40,4 @@ object NotificationHelper {
         return ForegroundInfo(NOTIFICATION_ID, notification)
     }
 }
+

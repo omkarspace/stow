@@ -2,6 +2,7 @@ package com.cleansaver.app.ui.library
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,11 +32,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.cleansaver.app.data.local.DownloadedMediaEntity
+import com.cleansaver.app.ui.components.MediaPreviewDialog
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -44,6 +50,7 @@ import java.util.Locale
 fun LibraryScreen(viewModel: LibraryViewModel) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    var previewItem by remember { mutableStateOf<DownloadedMediaEntity?>(null) }
 
     Column(
         modifier = Modifier
@@ -97,7 +104,9 @@ fun LibraryScreen(viewModel: LibraryViewModel) {
             ) {
                 items(state.items, key = { it.id }) { item ->
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { previewItem = item },
                         shape = RoundedCornerShape(14.dp)
                     ) {
                         Row(
@@ -136,19 +145,8 @@ fun LibraryScreen(viewModel: LibraryViewModel) {
                             }
 
                             // Open action
-                            IconButton(onClick = {
-                                try {
-                                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                                        setDataAndType(
-                                            Uri.parse(item.mediaStoreUri),
-                                            if (item.mediaType == "VIDEO") "video/*" else "image/*"
-                                        )
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    }
-                                    context.startActivity(intent)
-                                } catch (_: Exception) {}
-                            }) {
-                                Icon(imageVector = Icons.Default.PlayArrow, contentDescription = "Open")
+                            IconButton(onClick = { previewItem = item }) {
+                                Icon(imageVector = Icons.Default.PlayArrow, contentDescription = "Play/View")
                             }
 
                             // Share action
@@ -179,5 +177,14 @@ fun LibraryScreen(viewModel: LibraryViewModel) {
             }
         }
     }
-}
 
+    // In-app media preview dialog
+    previewItem?.let { item ->
+        MediaPreviewDialog(
+            mediaUriOrUrl = item.mediaStoreUri,
+            isVideo = item.mediaType == "VIDEO",
+            title = item.fileName,
+            onDismiss = { previewItem = null }
+        )
+    }
+}
