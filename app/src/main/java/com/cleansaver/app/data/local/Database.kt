@@ -49,8 +49,7 @@ interface DownloadedMediaDao {
     suspend fun clearAll()
 }
 
-@Database(entities = [DownloadedMediaEntity::class], version = 1, exportSchema = true)
+@Database(entities = [DownloadedMediaEntity::class], version = 1, exportSchema = false)
 abstract class CleanSaverDatabase : RoomDatabase() {
     abstract fun downloadedMediaDao(): DownloadedMediaDao
 }
-
