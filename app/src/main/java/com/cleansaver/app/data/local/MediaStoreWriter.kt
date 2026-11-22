@@ -67,6 +67,11 @@ class MediaStoreWriter(
                     throw IllegalStateException("HTTP server returned error code: ${response.code}")
                 }
 
+                val contentType = response.header("Content-Type").orEmpty().lowercase()
+                if (isVideo && (contentType.startsWith("image/") || contentType.startsWith("text/html"))) {
+                    throw IllegalStateException("Expected video stream but received $contentType")
+                }
+
                 val body = response.body ?: throw IllegalStateException("Response body is null")
                 val totalBytes = body.contentLength()
                 inputStream = body.byteStream()

@@ -6,6 +6,7 @@ import com.cleansaver.app.domain.model.CustomThrowable
 import com.cleansaver.app.domain.model.MediaCandidate
 import com.cleansaver.app.domain.model.MediaType
 import com.cleansaver.app.domain.model.ParsedUrl
+import com.cleansaver.app.domain.model.UrlKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.CookieJar
@@ -23,7 +24,13 @@ class EmbedHttpExtractor(
     override val id: String = "HTTP_EMBED"
 
     private val videoUrlFallbackPattern = Pattern.compile(
-        """\\?"video_url\\?"\s*:\s*\\?"(https?:[^"\\]+(?:\\[^"\\][^"\\]*)*)\\?""""
+        """\\?"(?:video_url|playback_url)\\?"\s*:\s*\\?"(https?:[^"\\]+(?:\\[^"\\][^"\\]*)*)\\?""""
+    )
+    private val videoVersionsUrlPattern = Pattern.compile(
+        """\\?"video_versions\\?"\s*:\s*\[\s*\{[^}]*?\\?"url\\?"\s*:\s*\\?"(https?:[^"\\]+(?:\\[^"\\][^"\\]*)*)\\?""""
+    )
+    private val mp4DirectPattern = Pattern.compile(
+        """(https?:(?:\\/|/){2}[^"'\s\\<>]+?\.mp4[^"'\s\\<>]*)"""
     )
     private val displayUrlFallbackPattern = Pattern.compile(
         """\\?"display_url\\?"\s*:\s*\\?"(https?:[^"\\]+(?:\\[^"\\][^"\\]*)*)\\?""""
@@ -51,7 +58,12 @@ class EmbedHttpExtractor(
         userAgent: String
     ): Result<List<MediaCandidate>> = withContext(Dispatchers.IO) {
         try {
-            val targetUrl = strategyConfig.endpointTemplate.replace("{shortcode}", parsedUrl.shortcode)
+            val baseTemplate = if (parsedUrl.kind == UrlKind.REEL && strategyConfig.endpointTemplate.contains("/p/{shortcode}/")) {
+                strategyConfig.endpointTemplate.replace("/p/{shortcode}/", "/reel/{shortcode}/")
+            } else {
+                strategyConfig.endpointTemplate
+            }
+            val targetUrl = baseTemplate.replace("{shortcode}", parsedUrl.shortcode)
 
             val client = baseOkHttpClient.newBuilder()
                 .connectTimeout(strategyConfig.timeoutMs, TimeUnit.MILLISECONDS)
@@ -81,7 +93,7 @@ class EmbedHttpExtractor(
                     return@withContext Result.failure(CustomThrowable(AppError.PrivateAccountNotSupported))
                 }
 
-                val candidates = parseCandidatesFromHtml(body, parsedUrl.shortcode, strategyConfig)
+                val candidates = parseCandidatesFromHtml(body, parsedUrl.shortcode, parsedUrl.kind, strategyConfig)
 
                 if (candidates.isNotEmpty()) {
                     Result.success(candidates)
@@ -101,6 +113,7 @@ class EmbedHttpExtractor(
     internal fun parseCandidatesFromHtml(
         body: String,
         shortcode: String,
+        urlKind: UrlKind,
         strategyConfig: StrategyDto
     ): List<MediaCandidate> {
         val seenUrls = LinkedHashSet<String>()
@@ -116,18 +129,36 @@ class EmbedHttpExtractor(
         extractMatches(ogImagePattern, body, imageUrls)
         val imageList = imageUrls.toList()
 
-        // Collect video URLs from configured regex + fallback patterns
+        // Collect video URLs from configured regex + modern Instagram JSON/HTML patterns
         val videoUrls = LinkedHashSet<String>()
         strategyConfig.videoRegex?.takeIf { it.isNotBlank() }?.let { regexStr ->
             extractMatches(Pattern.compile(regexStr), body, videoUrls)
         }
         extractMatches(videoUrlFallbackPattern, body, videoUrls)
+        extractMatches(videoVersionsUrlPattern, body, videoUrls)
         extractMatches(videoTagPattern, body, videoUrls)
         extractMatches(ogVideoPattern, body, videoUrls)
+        if (videoUrls.isEmpty()) {
+            extractMatches(mp4DirectPattern, body, videoUrls)
+        }
+
+        // Filter out non-media or static asset URLs
+        val validVideos = videoUrls.filter { url ->
+            !url.contains("static.cdninstagram.com/rsrc.php", ignoreCase = true)
+        }
+
+        val isKnownVideoPost = urlKind == UrlKind.REEL ||
+            body.contains("\"is_video\":true", ignoreCase = true) ||
+            body.contains("EmbedIsVideo", ignoreCase = true)
+
+        // CRITICAL: Never return only a thumbnail image for a Reel or video post.
+        // Returning empty lets MediaExtractorChain fall back to EphemeralWebViewExtractor.
+        if (isKnownVideoPost && validVideos.isEmpty()) {
+            return emptyList()
+        }
 
         var slideIndex = 0
-        val videoList = videoUrls.toList()
-        videoList.forEachIndexed { idx, videoUrl ->
+        validVideos.forEachIndexed { idx, videoUrl ->
             if (seenUrls.add(videoUrl)) {
                 val thumb = imageList.getOrNull(idx) ?: imageList.firstOrNull()
                 candidates.add(
@@ -144,31 +175,30 @@ class EmbedHttpExtractor(
             }
         }
 
-        // Include image slides:
-        // - If no videos were found, include all unique images.
-        // - If videos were found and there are more images than videos (mixed carousel),
-        //   include the extra images beyond the video thumbnails.
-        val imagesToAdd = if (videoList.isEmpty()) {
-            imageList
-        } else if (imageList.size > videoList.size) {
-            imageList.drop(videoList.size)
-        } else {
-            emptyList()
-        }
+        // Include image slides only for non-Reel posts (or mixed carousels)
+        if (urlKind != UrlKind.REEL) {
+            val imagesToAdd = if (validVideos.isEmpty()) {
+                imageList
+            } else if (imageList.size > validVideos.size) {
+                imageList.drop(validVideos.size)
+            } else {
+                emptyList()
+            }
 
-        imagesToAdd.forEach { imageUrl ->
-            if (seenUrls.add(imageUrl)) {
-                candidates.add(
-                    MediaCandidate(
-                        shortcode = shortcode,
-                        slideIndex = slideIndex++,
-                        mediaType = MediaType.IMAGE,
-                        downloadUrl = imageUrl,
-                        thumbnailUrl = imageUrl,
-                        width = null,
-                        height = null
+            imagesToAdd.forEach { imageUrl ->
+                if (seenUrls.add(imageUrl)) {
+                    candidates.add(
+                        MediaCandidate(
+                            shortcode = shortcode,
+                            slideIndex = slideIndex++,
+                            mediaType = MediaType.IMAGE,
+                            downloadUrl = imageUrl,
+                            thumbnailUrl = imageUrl,
+                            width = null,
+                            height = null
+                        )
                     )
-                )
+                }
             }
         }
 

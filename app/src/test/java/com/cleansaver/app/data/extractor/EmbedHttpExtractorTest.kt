@@ -21,11 +21,18 @@ class EmbedHttpExtractorTest {
     private lateinit var server: MockWebServer
     private lateinit var extractor: EmbedHttpExtractor
 
-    private val sampleParsedUrl = ParsedUrl(
+    private val sampleReelUrl = ParsedUrl(
         rawUrl = "https://www.instagram.com/reel/TEST12345/",
         canonicalUrl = "https://www.instagram.com/reel/TEST12345/",
         shortcode = "TEST12345",
         kind = UrlKind.REEL
+    )
+
+    private val samplePostUrl = ParsedUrl(
+        rawUrl = "https://www.instagram.com/p/POST12345/",
+        canonicalUrl = "https://www.instagram.com/p/POST12345/",
+        shortcode = "POST12345",
+        kind = UrlKind.POST
     )
 
     @Before
@@ -59,7 +66,7 @@ class EmbedHttpExtractorTest {
         """.trimIndent()
         server.enqueue(MockResponse().setResponseCode(200).setBody(html))
 
-        val result = extractor.extract(sampleParsedUrl, strategy(), "TestAgent")
+        val result = extractor.extract(sampleReelUrl, strategy(), "TestAgent")
         assertTrue(result.isSuccess)
 
         val candidates = result.getOrThrow()
@@ -70,7 +77,40 @@ class EmbedHttpExtractorTest {
     }
 
     @Test
-    fun `extracts mixed video and image carousel without duplicates`() = runTest {
+    fun `extracts reel video from video_versions json`() = runTest {
+        val html = """
+            <html><script>
+            {"video_versions":[{"type":101,"url":"https:\/\/scontent.cdninstagram.com\/v\/t50\/reel_hd.mp4?efg=abc\u0026oe=123"}],"display_url":"https:\/\/scontent.cdninstagram.com\/thumb.jpg"}
+            </script></html>
+        """.trimIndent()
+        server.enqueue(MockResponse().setResponseCode(200).setBody(html))
+
+        val result = extractor.extract(sampleReelUrl, strategy(), "TestAgent")
+        assertTrue(result.isSuccess)
+        val candidates = result.getOrThrow()
+        assertEquals(1, candidates.size)
+        assertEquals(MediaType.VIDEO, candidates[0].mediaType)
+        assertEquals("https://scontent.cdninstagram.com/v/t50/reel_hd.mp4?efg=abc&oe=123", candidates[0].downloadUrl)
+    }
+
+    @Test
+    fun `reel with only thumbnail image fails so chain falls back to webview`() = runTest {
+        val html = """
+            <html><body>
+            <img class="EmbeddedMediaImage" src="https://scontent.cdninstagram.com/thumb_only.jpg" />
+            <meta property="og:image" content="https://scontent.cdninstagram.com/thumb_only.jpg" />
+            </body></html>
+        """.trimIndent()
+        server.enqueue(MockResponse().setResponseCode(200).setBody(html))
+
+        val result = extractor.extract(sampleReelUrl, strategy(), "TestAgent")
+        assertTrue(result.isFailure)
+        val err = (result.exceptionOrNull() as? CustomThrowable)?.appError
+        assertEquals(AppError.ParserOutdated, err)
+    }
+
+    @Test
+    fun `extracts mixed video and image carousel without duplicates for posts`() = runTest {
         val html = """
             <html><script>
             "video_url":"https:\/\/cdn.instagram.com\/v\/slide1.mp4",
@@ -81,7 +121,7 @@ class EmbedHttpExtractorTest {
         """.trimIndent()
         server.enqueue(MockResponse().setResponseCode(200).setBody(html))
 
-        val result = extractor.extract(sampleParsedUrl, strategy(), "TestAgent")
+        val result = extractor.extract(samplePostUrl, strategy(), "TestAgent")
         assertTrue(result.isSuccess)
 
         val candidates = result.getOrThrow()
@@ -103,7 +143,7 @@ class EmbedHttpExtractorTest {
         """.trimIndent()
         server.enqueue(MockResponse().setResponseCode(200).setBody(html))
 
-        val result = extractor.extract(sampleParsedUrl, strategy(), "TestAgent")
+        val result = extractor.extract(sampleReelUrl, strategy(), "TestAgent")
         assertTrue(result.isSuccess)
 
         val candidates = result.getOrThrow()
@@ -116,7 +156,7 @@ class EmbedHttpExtractorTest {
     fun `detects private account html response`() = runTest {
         server.enqueue(MockResponse().setResponseCode(200).setBody("<html>This Account is Private</html>"))
 
-        val result = extractor.extract(sampleParsedUrl, strategy(), "TestAgent")
+        val result = extractor.extract(sampleReelUrl, strategy(), "TestAgent")
         assertTrue(result.isFailure)
         val err = (result.exceptionOrNull() as? CustomThrowable)?.appError
         assertEquals(AppError.PrivateAccountNotSupported, err)
@@ -125,11 +165,11 @@ class EmbedHttpExtractorTest {
     @Test
     fun `maps 404 to PostNotFound and 429 to NetworkRateLimited`() = runTest {
         server.enqueue(MockResponse().setResponseCode(404))
-        val notFound = extractor.extract(sampleParsedUrl, strategy(), "TestAgent")
+        val notFound = extractor.extract(sampleReelUrl, strategy(), "TestAgent")
         assertEquals(AppError.PostNotFound, (notFound.exceptionOrNull() as? CustomThrowable)?.appError)
 
         server.enqueue(MockResponse().setResponseCode(429))
-        val rateLimited = extractor.extract(sampleParsedUrl, strategy(), "TestAgent")
+        val rateLimited = extractor.extract(sampleReelUrl, strategy(), "TestAgent")
         assertEquals(AppError.NetworkRateLimited, (rateLimited.exceptionOrNull() as? CustomThrowable)?.appError)
     }
 }

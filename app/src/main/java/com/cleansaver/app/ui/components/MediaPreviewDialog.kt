@@ -17,12 +17,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -44,6 +49,8 @@ fun MediaPreviewDialog(
 ) {
     val context = LocalContext.current
     val isLocalContent = mediaUriOrUrl.startsWith("content://")
+    var isBuffering by remember { mutableStateOf(isVideo) }
+    var playbackError by remember { mutableStateOf<String?>(null) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -58,13 +65,30 @@ fun MediaPreviewDialog(
                     AndroidView(
                         factory = { ctx ->
                             VideoView(ctx).apply {
-                                setVideoURI(Uri.parse(mediaUriOrUrl))
+                                val uri = Uri.parse(mediaUriOrUrl)
+                                if (isLocalContent) {
+                                    setVideoURI(uri)
+                                } else {
+                                    setVideoURI(
+                                        uri,
+                                        mapOf(
+                                            "User-Agent" to "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+                                            "Referer" to "https://www.instagram.com/"
+                                        )
+                                    )
+                                }
                                 val controller = MediaController(ctx)
                                 controller.setAnchorView(this)
                                 setMediaController(controller)
                                 setOnPreparedListener { mp ->
+                                    isBuffering = false
                                     mp.isLooping = true
                                     start()
+                                }
+                                setOnErrorListener { _, _, _ ->
+                                    isBuffering = false
+                                    playbackError = "Unable to stream preview. You can still save to gallery."
+                                    true
                                 }
                             }
                         },
@@ -75,6 +99,27 @@ fun MediaPreviewDialog(
                             .fillMaxWidth()
                             .align(Alignment.Center)
                     )
+
+                    if (isBuffering) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .align(Alignment.Center)
+                        )
+                    }
+
+                    playbackError?.let { msg ->
+                        Text(
+                            text = msg,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.8f),
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .padding(horizontal = 32.dp)
+                        )
+                    }
                 } else {
                     AsyncImage(
                         model = if (isLocalContent) Uri.parse(mediaUriOrUrl) else mediaUriOrUrl,

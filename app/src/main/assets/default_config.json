@@ -32,7 +32,7 @@
       "video_regex": "meta[property='og:video']",
       "image_regex": "meta[property='og:image']",
       "json_script_selector": "",
-      "timeout_ms": 10000
+      "timeout_ms": 15000
     }
   ]
 }
