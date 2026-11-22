@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">CleanSaver</string>
+    <string name="paste_link">Paste Link</string>
+    <string name="download">Download</string>
+    <string name="saving_to_gallery">Saving to Gallery…</string>
+    <string name="saved_to_gallery">Saved to Gallery!</string>
+    <string name="error_invalid_url">Please enter a valid public Instagram Reel or Post link.</string>
+    <string name="error_stories_unsupported">Saving Stories is not supported.</string>
+    <string name="error_private_account">Cannot save media from private accounts.</string>
+    <string name="error_post_not_found">Post not found or has been removed.</string>
+    <string name="error_network_rate_limited">Rate limit reached. Please try again later.</string>
+    <string name="error_parser_outdated">Parser error. Please update parser rules in Settings.</string>
+    <string name="error_no_internet">No internet connection available.</string>
+</resources>
+
