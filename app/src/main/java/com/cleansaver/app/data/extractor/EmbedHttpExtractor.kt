@@ -24,16 +24,16 @@ class EmbedHttpExtractor(
     override val id: String = "HTTP_EMBED"
 
     private val videoUrlFallbackPattern = Pattern.compile(
-        """\\?"(?:video_url|playback_url)\\?"\s*:\s*\\?"(https?:[^"\\]+(?:\\[^"\\][^"\\]*)*)\\?""""
+        """\\?"(?:video_url|playback_url)\\?"\s*:\s*\\?"(https?:[^"\\]*(?:\\[^"\\][^"\\]*)*)\\?""""
     )
     private val videoVersionsUrlPattern = Pattern.compile(
-        """\\?"video_versions\\?"\s*:\s*\[\s*\{[^}]*?\\?"url\\?"\s*:\s*\\?"(https?:[^"\\]+(?:\\[^"\\][^"\\]*)*)\\?""""
+        """\\?"video_versions\\?"\s*:\s*\[\s*\{[^}]*?\\?"url\\?"\s*:\s*\\?"(https?:[^"\\]*(?:\\[^"\\][^"\\]*)*)\\?""""
     )
     private val mp4DirectPattern = Pattern.compile(
         """(https?:(?:\\/|/){2}[^"'\s\\<>]+?\.mp4[^"'\s\\<>]*)"""
     )
     private val displayUrlFallbackPattern = Pattern.compile(
-        """\\?"display_url\\?"\s*:\s*\\?"(https?:[^"\\]+(?:\\[^"\\][^"\\]*)*)\\?""""
+        """\\?"display_url\\?"\s*:\s*\\?"(https?:[^"\\]*(?:\\[^"\\][^"\\]*)*)\\?""""
     )
     private val ogVideoPattern = Pattern.compile(
         """<meta[^>]+property=["']og:video(?::secure_url)?["'][^>]+content=["'](https?://[^"']+)["']""",
