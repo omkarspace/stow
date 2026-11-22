@@ -36,3 +36,4 @@ jobs:
       with:
         name: cleansaver-debug-apk
         path: app/build/outputs/apk/debug/*.apk
+

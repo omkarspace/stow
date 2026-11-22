@@ -1,0 +1,13 @@
+CleanSaver is an open-source, utility-first Android application that saves public Instagram Reels, photos, and carousels directly to your local gallery with zero friction.
+
+Key Features:
+- Zero ads · Zero paywalls · Zero logins · Zero telemetry.
+- 100% On-Device: All requests run directly from your phone to public endpoints. No proxy or middleman servers.
+- Share Sheet Integration: Share any Reel or Post directly from Instagram and save with 1 tap.
+- Batch Carousel Downloads: Save multi-slide carousels with individual slide selection or batch saving.
+- In-App Full-Screen Player: Loop reels in full-screen before or after saving.
+- Scoped Storage Native: Saves directly to Movies/CleanSaver and Pictures/CleanSaver without requesting broad storage permissions.
+- Local Library: Filter saved items by Reels or Photos, open in default viewers, or share.
+- Dynamic Parser Resilience: Auto-syncs extraction rules so saves keep working seamlessly.
+
+CleanSaver is an independent utility unaffiliated with Meta or Instagram. Users are responsible for respecting creator rights and fair-use guidelines.

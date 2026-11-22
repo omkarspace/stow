@@ -23,7 +23,12 @@ class RemoteConfigRepositoryImpl(
 ) : RemoteConfigRepository {
 
     companion object {
-        private const val CONFIG_URL = "https://cleansaver.github.io/config/config.json"
+        // High-availability candidate endpoints with automatic fallback
+        val CONFIG_URLS = listOf(
+            "https://cleansaver.github.io/config/config.json",
+            "https://omkarspace.github.io/cleansaver/config/config.json",
+            "https://raw.githubusercontent.com/omkarspace/cleansaver/main/config/config.json"
+        )
         private const val SUPPORTED_SCHEMA_VERSION = 1
 
         val KEY_CONFIG_JSON = stringPreferencesKey("config_json")
@@ -45,45 +50,49 @@ class RemoteConfigRepositoryImpl(
             return cachedConfig
         }
 
-        return try {
-            val requestBuilder = Request.Builder()
-                .url(CONFIG_URL)
-                .get()
+        val client = okHttpClient.newBuilder()
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(5, TimeUnit.SECONDS)
+            .build()
 
-            if (cachedEtag.isNotEmpty()) {
-                requestBuilder.header("If-None-Match", cachedEtag)
-            }
+        // Attempt each candidate endpoint in order
+        for (url in CONFIG_URLS) {
+            try {
+                val requestBuilder = Request.Builder()
+                    .url(url)
+                    .get()
 
-            val client = okHttpClient.newBuilder()
-                .connectTimeout(5, TimeUnit.SECONDS)
-                .readTimeout(5, TimeUnit.SECONDS)
-                .build()
-
-            client.newCall(requestBuilder.build()).execute().use { response ->
-                if (response.code == 304 && cachedConfig != null) {
-                    dataStore.edit { it[KEY_CONFIG_LAST_SYNC] = now }
-                    return cachedConfig
+                if (cachedEtag.isNotEmpty()) {
+                    requestBuilder.header("If-None-Match", cachedEtag)
                 }
 
-                if (response.isSuccessful) {
-                    val responseBody = response.body?.string() ?: throw IllegalStateException("Empty body")
-                    val newConfig = json.decodeFromString<ParserConfigDto>(responseBody)
+                client.newCall(requestBuilder.build()).execute().use { response ->
+                    if (response.code == 304 && cachedConfig != null) {
+                        dataStore.edit { it[KEY_CONFIG_LAST_SYNC] = now }
+                        return cachedConfig
+                    }
 
-                    if (newConfig.schemaVersion <= SUPPORTED_SCHEMA_VERSION) {
-                        val newEtag = response.header("ETag") ?: ""
-                        dataStore.edit { mutablePrefs ->
-                            mutablePrefs[KEY_CONFIG_JSON] = responseBody
-                            mutablePrefs[KEY_CONFIG_ETAG] = newEtag
-                            mutablePrefs[KEY_CONFIG_LAST_SYNC] = now
+                    if (response.isSuccessful) {
+                        val responseBody = response.body?.string() ?: throw IllegalStateException("Empty body")
+                        val newConfig = json.decodeFromString<ParserConfigDto>(responseBody)
+
+                        if (newConfig.schemaVersion <= SUPPORTED_SCHEMA_VERSION) {
+                            val newEtag = response.header("ETag") ?: ""
+                            dataStore.edit { mutablePrefs ->
+                                mutablePrefs[KEY_CONFIG_JSON] = responseBody
+                                mutablePrefs[KEY_CONFIG_ETAG] = newEtag
+                                mutablePrefs[KEY_CONFIG_LAST_SYNC] = now
+                            }
+                            return newConfig
                         }
-                        return newConfig
                     }
                 }
-                cachedConfig ?: loadBundledDefaultConfig()
+            } catch (_: Exception) {
+                // Try next endpoint fallback
             }
-        } catch (e: Exception) {
-            cachedConfig ?: loadBundledDefaultConfig()
         }
+
+        return cachedConfig ?: loadBundledDefaultConfig()
     }
 
     override suspend fun refreshConfig(force: Boolean): Result<Unit> {
@@ -112,4 +121,3 @@ class RemoteConfigRepositoryImpl(
         }
     }
 }
-
