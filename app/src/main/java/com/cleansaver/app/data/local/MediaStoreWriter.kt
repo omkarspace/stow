@@ -20,6 +20,11 @@ class MediaStoreWriter(
     private val context: Context,
     private val okHttpClient: OkHttpClient
 ) {
+    companion object {
+        private const val CDN_USER_AGENT =
+            "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+    }
+
     suspend fun downloadToGallery(
         candidate: MediaCandidate,
         onProgress: (bytesRead: Long, totalBytes: Long, percent: Int) -> Unit
@@ -51,46 +56,52 @@ class MediaStoreWriter(
         var outputStream: OutputStream? = null
 
         try {
-            val request = Request.Builder().url(candidate.downloadUrl).build()
-            val response = okHttpClient.newCall(request).execute()
+            val request = Request.Builder()
+                .url(candidate.downloadUrl)
+                .header("User-Agent", CDN_USER_AGENT)
+                .header("Referer", "https://www.instagram.com/")
+                .build()
 
-            if (!response.isSuccessful) {
-                throw IllegalStateException("HTTP server returned error code: ${response.code}")
-            }
+            okHttpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    throw IllegalStateException("HTTP server returned error code: ${response.code}")
+                }
 
-            val body = response.body ?: throw IllegalStateException("Response body is null")
-            val totalBytes = body.contentLength()
-            inputStream = body.byteStream()
-            outputStream = contentResolver.openOutputStream(pendingUri)
-                ?: throw IllegalStateException("Failed to open output stream for URI: $pendingUri")
+                val body = response.body ?: throw IllegalStateException("Response body is null")
+                val totalBytes = body.contentLength()
+                inputStream = body.byteStream()
+                outputStream = contentResolver.openOutputStream(pendingUri)
+                    ?: throw IllegalStateException("Failed to open output stream for URI: $pendingUri")
 
-            val buffer = ByteArray(16384)
-            var bytesReadTotal = 0L
-            var read: Int
-            var lastReportedPercent = -1
+                val buffer = ByteArray(16384)
+                var bytesReadTotal = 0L
+                var read: Int
+                var lastReportedPercent = -1
 
-            while (inputStream.read(buffer).also { read = it } != -1) {
-                outputStream.write(buffer, 0, read)
-                bytesReadTotal += read
+                while (inputStream!!.read(buffer).also { read = it } != -1) {
+                    outputStream!!.write(buffer, 0, read)
+                    bytesReadTotal += read
 
-                if (totalBytes > 0) {
-                    val percent = ((bytesReadTotal * 100) / totalBytes).toInt()
-                    if (percent != lastReportedPercent) {
-                        lastReportedPercent = percent
-                        onProgress(bytesReadTotal, totalBytes, percent)
+                    if (totalBytes > 0) {
+                        val percent = ((bytesReadTotal * 100) / totalBytes).toInt().coerceIn(0, 100)
+                        if (percent != lastReportedPercent) {
+                            lastReportedPercent = percent
+                            onProgress(bytesReadTotal, totalBytes, percent)
+                        }
+                    } else if (bytesReadTotal % (64 * 1024) < 16384) {
+                        onProgress(bytesReadTotal, -1L, 0)
                     }
                 }
+                outputStream!!.flush()
+
+                // Finalize entry creation: Toggle IS_PENDING to 0
+                val publishValues = ContentValues().apply {
+                    put(MediaStore.MediaColumns.IS_PENDING, 0)
+                }
+                contentResolver.update(pendingUri, publishValues, null, null)
+
+                Result.success(SavedFileMeta(pendingUri.toString(), fileName, bytesReadTotal))
             }
-            outputStream.flush()
-
-            // Finalize entry creation: Toggle IS_PENDING to 0
-            val publishValues = ContentValues().apply {
-                put(MediaStore.MediaColumns.IS_PENDING, 0)
-            }
-            contentResolver.update(pendingUri, publishValues, null, null)
-
-            Result.success(SavedFileMeta(pendingUri.toString(), fileName, bytesReadTotal))
-
         } catch (e: Throwable) {
             // Guarantee atomic cleanup: Purge partial file from MediaStore on failure
             try {
@@ -104,4 +115,3 @@ class MediaStoreWriter(
         }
     }
 }
-

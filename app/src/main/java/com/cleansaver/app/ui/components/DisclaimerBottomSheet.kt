@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -13,7 +15,6 @@ import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -24,32 +25,35 @@ fun DisclaimerBottomSheet(
 ) {
     ModalBottomSheet(
         onDismissRequest = { /* Require explicit accept */ },
-        sheetState = sheetState
+        sheetState = sheetState,
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .padding(horizontal = 24.dp, vertical = 12.dp)
         ) {
             Text(
                 text = "Welcome to CleanSaver",
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+                color = MaterialTheme.colorScheme.onSurface
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Text(
-                text = "CleanSaver is an independent, utility-first media saver for Android built on strict privacy principles:",
-                style = MaterialTheme.typography.bodyMedium
+                text = "A minimal, on-device utility for saving public Instagram media.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Text(
-                text = "• 100% On-Device: All requests run directly from your phone to public CDNs. No proxy or backend servers.\n" +
-                       "• Zero Analytics & Ads: No SDKs, no tracking, no logins, no personal data collection.\n" +
-                       "• Independent & Fair Use: CleanSaver is unaffiliated with Meta or Instagram. Users are responsible for respecting creator rights and fair-use guidelines.",
+                text = "• 100% on-device — no backend servers or proxies.\n" +
+                    "• Zero ads, zero logins, and zero analytics.\n" +
+                    "• Independent utility unaffiliated with Meta or Instagram. Respect creator rights and fair-use guidelines.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -58,13 +62,20 @@ fun DisclaimerBottomSheet(
 
             Button(
                 onClick = onAccept,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
             ) {
-                Text("I Understand & Agree")
+                Text("Continue", style = MaterialTheme.typography.labelLarge)
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
         }
     }
 }
-

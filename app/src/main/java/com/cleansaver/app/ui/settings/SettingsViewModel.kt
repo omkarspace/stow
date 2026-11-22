@@ -23,6 +23,7 @@ class SettingsViewModel(
 
     private val _isRefreshing = MutableStateFlow(false)
     private val _refreshMessage = MutableStateFlow<String?>(null)
+    private val _refreshSuccess = MutableStateFlow(true)
 
     val uiState: StateFlow<SettingsUiState> = combine(
         userPrefsRepository.themeMode,
@@ -35,13 +36,15 @@ class SettingsViewModel(
             themeMode = theme,
             clipboardAutoDetect = clipboard,
             fairUseAccepted = fairUse,
+            isLoaded = true,
             isRefreshingConfig = refreshing,
-            configRefreshMessage = msg
+            configRefreshMessage = msg,
+            configRefreshSuccess = _refreshSuccess.value
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = SettingsUiState()
+        initialValue = SettingsUiState(isLoaded = false)
     )
 
     fun setThemeMode(mode: String) {
@@ -68,10 +71,11 @@ class SettingsViewModel(
             _refreshMessage.value = null
             val result = remoteConfigRepository.refreshConfig(force = true)
             _isRefreshing.value = false
+            _refreshSuccess.value = result.isSuccess
             _refreshMessage.value = if (result.isSuccess) {
-                "Rules updated successfully!"
+                "Parser rules are up to date."
             } else {
-                "Could not reach remote server. Using local cache."
+                "Offline — using bundled fallback rules."
             }
         }
     }
@@ -96,4 +100,3 @@ class SettingsViewModel(
             }
     }
 }
-

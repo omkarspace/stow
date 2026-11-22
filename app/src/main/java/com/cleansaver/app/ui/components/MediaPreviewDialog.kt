@@ -6,18 +6,14 @@ import android.widget.MediaController
 import android.widget.VideoView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Share
@@ -29,11 +25,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
@@ -48,6 +43,7 @@ fun MediaPreviewDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val isLocalContent = mediaUriOrUrl.startsWith("content://")
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -58,7 +54,6 @@ fun MediaPreviewDialog(
             color = Color.Black
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                // Media Content
                 if (isVideo) {
                     AndroidView(
                         factory = { ctx ->
@@ -73,13 +68,16 @@ fun MediaPreviewDialog(
                                 }
                             }
                         },
+                        onRelease = { view ->
+                            view.stopPlayback()
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .align(Alignment.Center)
                     )
                 } else {
                     AsyncImage(
-                        model = mediaUriOrUrl,
+                        model = if (isLocalContent) Uri.parse(mediaUriOrUrl) else mediaUriOrUrl,
                         contentDescription = "Preview",
                         modifier = Modifier
                             .fillMaxWidth()
@@ -88,7 +86,7 @@ fun MediaPreviewDialog(
                     )
                 }
 
-                // Top Header Overlay with Close & Share Buttons
+                // Minimal Top Bar Overlay
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -100,9 +98,14 @@ fun MediaPreviewDialog(
                         onClick = onDismiss,
                         modifier = Modifier
                             .size(40.dp)
-                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                            .background(Color.Black.copy(alpha = 0.55f), CircleShape)
                     ) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
 
                     Spacer(modifier = Modifier.width(12.dp))
@@ -111,31 +114,37 @@ fun MediaPreviewDialog(
                         text = title,
                         style = MaterialTheme.typography.titleMedium,
                         color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f),
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
 
-                    IconButton(
-                        onClick = {
-                            try {
-                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                    type = if (isVideo) "video/*" else "image/*"
-                                    putExtra(Intent.EXTRA_STREAM, Uri.parse(mediaUriOrUrl))
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                }
-                                context.startActivity(Intent.createChooser(shareIntent, "Share Media"))
-                            } catch (_: Exception) {}
-                        },
-                        modifier = Modifier
-                            .size(40.dp)
-                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                    ) {
-                        Icon(imageVector = Icons.Default.Share, contentDescription = "Share", tint = Color.White)
+                    if (isLocalContent) {
+                        IconButton(
+                            onClick = {
+                                try {
+                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = if (isVideo) "video/*" else "image/*"
+                                        putExtra(Intent.EXTRA_STREAM, Uri.parse(mediaUriOrUrl))
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(Intent.createChooser(shareIntent, "Share Media"))
+                                } catch (_: Exception) {}
+                            },
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(Color.Black.copy(alpha = 0.55f), CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Share",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
             }
         }
     }
 }
-

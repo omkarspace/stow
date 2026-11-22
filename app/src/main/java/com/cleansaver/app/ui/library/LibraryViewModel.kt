@@ -7,32 +7,42 @@ import com.cleansaver.app.data.local.DownloadedMediaEntity
 import com.cleansaver.app.di.AppContainer
 import com.cleansaver.app.domain.repository.LibraryRepository
 import com.cleansaver.app.ui.state.LibraryUiState
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalCoroutinesApi::class)
 class LibraryViewModel(
     private val libraryRepository: LibraryRepository
 ) : ViewModel() {
 
     private val _filterType = MutableStateFlow("ALL")
+    private val _searchQuery = MutableStateFlow("")
 
-    val uiState: StateFlow<LibraryUiState> = _filterType.flatMapLatest { filter ->
-        if (filter == "ALL") {
-            libraryRepository.observeAllMedia()
-        } else {
-            libraryRepository.observeMediaByType(filter)
+    val uiState: StateFlow<LibraryUiState> = combine(
+        libraryRepository.observeAllMedia(),
+        _filterType,
+        _searchQuery
+    ) { allItems, filter, query ->
+        val trimmedQuery = query.trim().lowercase()
+        val filtered = allItems.filter { item ->
+            val matchesType = filter == "ALL" || item.mediaType == filter
+            val matchesQuery = trimmedQuery.isEmpty() ||
+                item.fileName.lowercase().contains(trimmedQuery) ||
+                item.shortcode.lowercase().contains(trimmedQuery)
+            matchesType && matchesQuery
         }
-    }.combine(_filterType) { items, filter ->
+
         LibraryUiState(
             filterType = filter,
-            items = items,
+            searchQuery = query,
+            items = filtered,
+            totalCount = allItems.size,
+            videoCount = allItems.count { it.mediaType == "VIDEO" },
+            imageCount = allItems.count { it.mediaType == "IMAGE" },
+            totalSizeBytes = allItems.sumOf { it.fileSizeBytes },
             isLoading = false
         )
     }.stateIn(
@@ -43,6 +53,10 @@ class LibraryViewModel(
 
     fun setFilter(type: String) {
         _filterType.value = type
+    }
+
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
     }
 
     fun deleteItem(item: DownloadedMediaEntity) {
@@ -69,4 +83,3 @@ class LibraryViewModel(
             }
     }
 }
-

@@ -6,9 +6,13 @@ import com.cleansaver.app.domain.model.CustomThrowable
 import com.cleansaver.app.domain.model.MediaCandidate
 import com.cleansaver.app.domain.model.MediaType
 import com.cleansaver.app.domain.model.ParsedUrl
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.CookieJar
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.IOException
+import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 
@@ -18,81 +22,66 @@ class EmbedHttpExtractor(
 
     override val id: String = "HTTP_EMBED"
 
+    private val videoUrlFallbackPattern = Pattern.compile(
+        """\\?"video_url\\?"\s*:\s*\\?"(https?:[^"\\]+(?:\\[^"\\][^"\\]*)*)\\?""""
+    )
+    private val displayUrlFallbackPattern = Pattern.compile(
+        """\\?"display_url\\?"\s*:\s*\\?"(https?:[^"\\]+(?:\\[^"\\][^"\\]*)*)\\?""""
+    )
+    private val ogVideoPattern = Pattern.compile(
+        """<meta[^>]+property=["']og:video(?::secure_url)?["'][^>]+content=["'](https?://[^"']+)["']""",
+        Pattern.CASE_INSENSITIVE
+    )
+    private val ogImagePattern = Pattern.compile(
+        """<meta[^>]+property=["']og:image["'][^>]+content=["'](https?://[^"']+)["']""",
+        Pattern.CASE_INSENSITIVE
+    )
+    private val embeddedImgPattern = Pattern.compile(
+        """<img[^>]+class=["'][^"']*EmbeddedMediaImage[^"']*["'][^>]+src=["'](https?://[^"']+)["']""",
+        Pattern.CASE_INSENSITIVE
+    )
+    private val videoTagPattern = Pattern.compile(
+        """<video[^>]+src=["'](https?://[^"']+)["']""",
+        Pattern.CASE_INSENSITIVE
+    )
+
     override suspend fun extract(
         parsedUrl: ParsedUrl,
         strategyConfig: StrategyDto,
         userAgent: String
-    ): Result<List<MediaCandidate>> {
-        return try {
+    ): Result<List<MediaCandidate>> = withContext(Dispatchers.IO) {
+        try {
             val targetUrl = strategyConfig.endpointTemplate.replace("{shortcode}", parsedUrl.shortcode)
 
             val client = baseOkHttpClient.newBuilder()
                 .connectTimeout(strategyConfig.timeoutMs, TimeUnit.MILLISECONDS)
                 .readTimeout(strategyConfig.timeoutMs, TimeUnit.MILLISECONDS)
+                .followRedirects(true)
                 .cookieJar(CookieJar.NO_COOKIES)
                 .build()
 
             val request = Request.Builder()
                 .url(targetUrl)
                 .header("User-Agent", userAgent)
+                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
                 .header("Accept-Language", "en-US,en;q=0.9")
+                .header("Sec-Fetch-Dest", "document")
+                .header("Sec-Fetch-Mode", "navigate")
                 .build()
 
             client.newCall(request).execute().use { response ->
-                if (response.code == 404) return Result.failure(CustomThrowable(AppError.PostNotFound))
-                if (response.code == 429) return Result.failure(CustomThrowable(AppError.NetworkRateLimited))
-                if (!response.isSuccessful) return Result.failure(CustomThrowable(AppError.ParserOutdated))
+                if (response.code == 404) return@withContext Result.failure(CustomThrowable(AppError.PostNotFound))
+                if (response.code == 429) return@withContext Result.failure(CustomThrowable(AppError.NetworkRateLimited))
+                if (!response.isSuccessful) return@withContext Result.failure(CustomThrowable(AppError.ParserOutdated))
 
                 val body = response.body?.string() ?: ""
-                if (body.contains("This Account is Private")) {
-                    return Result.failure(CustomThrowable(AppError.PrivateAccountNotSupported))
+                if (body.contains("This Account is Private", ignoreCase = true) ||
+                    body.contains("\"is_private\":true", ignoreCase = true)
+                ) {
+                    return@withContext Result.failure(CustomThrowable(AppError.PrivateAccountNotSupported))
                 }
 
-                val candidates = mutableListOf<MediaCandidate>()
-
-                // Check for video first
-                strategyConfig.videoRegex?.let { regexStr ->
-                    val matcher = Pattern.compile(regexStr).matcher(body)
-                    var index = 0
-                    while (matcher.find()) {
-                        val rawUrl = matcher.group(1) ?: continue
-                        val cleanUrl = unescapeUrl(rawUrl)
-                        candidates.add(
-                            MediaCandidate(
-                                shortcode = parsedUrl.shortcode,
-                                slideIndex = index++,
-                                mediaType = MediaType.VIDEO,
-                                downloadUrl = cleanUrl,
-                                thumbnailUrl = null,
-                                width = null,
-                                height = null
-                            )
-                        )
-                    }
-                }
-
-                // If no video found, match images
-                if (candidates.isEmpty()) {
-                    strategyConfig.imageRegex?.let { regexStr ->
-                        val matcher = Pattern.compile(regexStr).matcher(body)
-                        var index = 0
-                        while (matcher.find()) {
-                            val rawUrl = matcher.group(1) ?: continue
-                            val cleanUrl = unescapeUrl(rawUrl)
-                            candidates.add(
-                                MediaCandidate(
-                                    shortcode = parsedUrl.shortcode,
-                                    slideIndex = index++,
-                                    mediaType = MediaType.IMAGE,
-                                    downloadUrl = cleanUrl,
-                                    thumbnailUrl = null,
-                                    width = null,
-                                    height = null
-                                )
-                            )
-                        }
-                    }
-                }
+                val candidates = parseCandidatesFromHtml(body, parsedUrl.shortcode, strategyConfig)
 
                 if (candidates.isNotEmpty()) {
                     Result.success(candidates)
@@ -100,15 +89,111 @@ class EmbedHttpExtractor(
                     Result.failure(CustomThrowable(AppError.ParserOutdated))
                 }
             }
+        } catch (e: UnknownHostException) {
+            Result.failure(CustomThrowable(AppError.NoInternet))
+        } catch (e: IOException) {
+            Result.failure(CustomThrowable(AppError.NoInternet))
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    private fun unescapeUrl(url: String): String {
-        return url.replace("\\/", "/")
+    internal fun parseCandidatesFromHtml(
+        body: String,
+        shortcode: String,
+        strategyConfig: StrategyDto
+    ): List<MediaCandidate> {
+        val seenUrls = LinkedHashSet<String>()
+        val candidates = mutableListOf<MediaCandidate>()
+
+        // Collect all image/thumbnail URLs first so videos can attach a matching thumbnail
+        val imageUrls = LinkedHashSet<String>()
+        strategyConfig.imageRegex?.takeIf { it.isNotBlank() }?.let { regexStr ->
+            extractMatches(Pattern.compile(regexStr), body, imageUrls)
+        }
+        extractMatches(displayUrlFallbackPattern, body, imageUrls)
+        extractMatches(embeddedImgPattern, body, imageUrls)
+        extractMatches(ogImagePattern, body, imageUrls)
+        val imageList = imageUrls.toList()
+
+        // Collect video URLs from configured regex + fallback patterns
+        val videoUrls = LinkedHashSet<String>()
+        strategyConfig.videoRegex?.takeIf { it.isNotBlank() }?.let { regexStr ->
+            extractMatches(Pattern.compile(regexStr), body, videoUrls)
+        }
+        extractMatches(videoUrlFallbackPattern, body, videoUrls)
+        extractMatches(videoTagPattern, body, videoUrls)
+        extractMatches(ogVideoPattern, body, videoUrls)
+
+        var slideIndex = 0
+        val videoList = videoUrls.toList()
+        videoList.forEachIndexed { idx, videoUrl ->
+            if (seenUrls.add(videoUrl)) {
+                val thumb = imageList.getOrNull(idx) ?: imageList.firstOrNull()
+                candidates.add(
+                    MediaCandidate(
+                        shortcode = shortcode,
+                        slideIndex = slideIndex++,
+                        mediaType = MediaType.VIDEO,
+                        downloadUrl = videoUrl,
+                        thumbnailUrl = thumb,
+                        width = null,
+                        height = null
+                    )
+                )
+            }
+        }
+
+        // Include image slides:
+        // - If no videos were found, include all unique images.
+        // - If videos were found and there are more images than videos (mixed carousel),
+        //   include the extra images beyond the video thumbnails.
+        val imagesToAdd = if (videoList.isEmpty()) {
+            imageList
+        } else if (imageList.size > videoList.size) {
+            imageList.drop(videoList.size)
+        } else {
+            emptyList()
+        }
+
+        imagesToAdd.forEach { imageUrl ->
+            if (seenUrls.add(imageUrl)) {
+                candidates.add(
+                    MediaCandidate(
+                        shortcode = shortcode,
+                        slideIndex = slideIndex++,
+                        mediaType = MediaType.IMAGE,
+                        downloadUrl = imageUrl,
+                        thumbnailUrl = imageUrl,
+                        width = null,
+                        height = null
+                    )
+                )
+            }
+        }
+
+        return candidates
+    }
+
+    private fun extractMatches(pattern: Pattern, body: String, destination: MutableSet<String>) {
+        val matcher = pattern.matcher(body)
+        while (matcher.find()) {
+            val rawUrl = matcher.group(1) ?: continue
+            val cleanUrl = unescapeUrl(rawUrl)
+            if (cleanUrl.startsWith("http://") || cleanUrl.startsWith("https://")) {
+                destination.add(cleanUrl)
+            }
+        }
+    }
+
+    internal fun unescapeUrl(url: String): String {
+        return url
+            .replace("\\\\/", "/")
+            .replace("\\/", "/")
+            .replace("\\u0026", "&")
+            .replace("\\\\u0026", "&")
             .replace("&amp;", "&")
             .replace("\\&", "&")
+            .trim()
     }
 }
-

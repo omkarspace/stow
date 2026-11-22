@@ -8,7 +8,9 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.cleansaver.app.data.remote.dto.ParserConfigDto
 import com.cleansaver.app.domain.repository.RemoteConfigRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -25,9 +27,9 @@ class RemoteConfigRepositoryImpl(
     companion object {
         // High-availability candidate endpoints with automatic fallback
         val CONFIG_URLS = listOf(
-            "https://cleansaver.github.io/config/config.json",
+            "https://raw.githubusercontent.com/omkarspace/cleansaver/main/config/config.json",
             "https://omkarspace.github.io/cleansaver/config/config.json",
-            "https://raw.githubusercontent.com/omkarspace/cleansaver/main/config/config.json"
+            "https://cleansaver.github.io/config/config.json"
         )
         private const val SUPPORTED_SCHEMA_VERSION = 1
 
@@ -36,7 +38,7 @@ class RemoteConfigRepositoryImpl(
         val KEY_CONFIG_LAST_SYNC = longPreferencesKey("config_last_sync_ms")
     }
 
-    override suspend fun getActiveConfig(forceRefresh: Boolean): ParserConfigDto {
+    override suspend fun getActiveConfig(forceRefresh: Boolean): ParserConfigDto = withContext(Dispatchers.IO) {
         val prefs = dataStore.data.first()
         val cachedJson = prefs[KEY_CONFIG_JSON]
         val cachedEtag = prefs[KEY_CONFIG_ETAG] ?: ""
@@ -47,7 +49,7 @@ class RemoteConfigRepositoryImpl(
         val ttlMs = (cachedConfig?.configTtlHours ?: 24) * 3600_000L
 
         if (!forceRefresh && cachedConfig != null && (now - lastSyncMs < ttlMs)) {
-            return cachedConfig
+            return@withContext cachedConfig
         }
 
         val client = okHttpClient.newBuilder()
@@ -69,7 +71,7 @@ class RemoteConfigRepositoryImpl(
                 client.newCall(requestBuilder.build()).execute().use { response ->
                     if (response.code == 304 && cachedConfig != null) {
                         dataStore.edit { it[KEY_CONFIG_LAST_SYNC] = now }
-                        return cachedConfig
+                        return@withContext cachedConfig
                     }
 
                     if (response.isSuccessful) {
@@ -83,7 +85,7 @@ class RemoteConfigRepositoryImpl(
                                 mutablePrefs[KEY_CONFIG_ETAG] = newEtag
                                 mutablePrefs[KEY_CONFIG_LAST_SYNC] = now
                             }
-                            return newConfig
+                            return@withContext newConfig
                         }
                     }
                 }
@@ -92,11 +94,11 @@ class RemoteConfigRepositoryImpl(
             }
         }
 
-        return cachedConfig ?: loadBundledDefaultConfig()
+        cachedConfig ?: loadBundledDefaultConfig()
     }
 
-    override suspend fun refreshConfig(force: Boolean): Result<Unit> {
-        return try {
+    override suspend fun refreshConfig(force: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
             getActiveConfig(forceRefresh = force)
             Result.success(Unit)
         } catch (e: Exception) {

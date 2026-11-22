@@ -42,6 +42,34 @@ class ValidateUrlUseCaseTest {
     }
 
     @Test
+    fun `username prefixed reel and post urls are parsed correctly`() {
+        val reelResult = useCase("https://www.instagram.com/natgeo/reel/C9988776655/?utm_source=ig_web_copy_link")
+        assertTrue(reelResult.isSuccess)
+        assertEquals("C9988776655", reelResult.getOrThrow().shortcode)
+        assertEquals(UrlKind.REEL, reelResult.getOrThrow().kind)
+
+        val postResult = useCase("https://www.instagram.com/design.daily/p/B1122334455/")
+        assertTrue(postResult.isSuccess)
+        assertEquals("B1122334455", postResult.getOrThrow().shortcode)
+        assertEquals(UrlKind.POST, postResult.getOrThrow().kind)
+    }
+
+    @Test
+    fun `mobile, short domain, reels, tv, and share urls are supported`() {
+        assertEquals("AbCdEf12345", useCase("https://m.instagram.com/reels/AbCdEf12345/").getOrThrow().shortcode)
+        assertEquals("XyZ98765432", useCase("https://instagr.am/p/XyZ98765432/").getOrThrow().shortcode)
+        assertEquals("TvCode12345", useCase("https://www.instagram.com/tv/TvCode12345/").getOrThrow().shortcode)
+        assertEquals("ShArE123456", useCase("https://www.instagram.com/share/reel/ShArE123456/").getOrThrow().shortcode)
+    }
+
+    @Test
+    fun `trailing punctuation around url is stripped`() {
+        val result = useCase("Look at this (https://www.instagram.com/p/B9876543210/).")
+        assertTrue(result.isSuccess)
+        assertEquals("B9876543210", result.getOrThrow().shortcode)
+    }
+
+    @Test
     fun `standard post url is parsed correctly`() {
         val input = "https://www.instagram.com/p/B9876543210/"
         val result = useCase(input)
@@ -79,4 +107,3 @@ class ValidateUrlUseCaseTest {
         assertTrue(result.isFailure)
     }
 }
-

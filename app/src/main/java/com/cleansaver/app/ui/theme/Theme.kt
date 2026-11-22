@@ -5,50 +5,51 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
-    primary = PrimaryIndigo,
-    onPrimary = LightSurface,
-    primaryContainer = PrimaryIndigoVariant,
-    onPrimaryContainer = DarkTextPrimary,
-    secondary = SecondaryViolet,
-    onSecondary = LightSurface,
-    tertiary = TertiaryCyan,
+    primary = DarkAccent,
+    onPrimary = DarkBackground,
+    primaryContainer = DarkAccentContainer,
+    onPrimaryContainer = DarkInkPrimary,
+    secondary = DarkInkSecondary,
+    onSecondary = DarkBackground,
+    secondaryContainer = DarkSurfaceVariant,
+    onSecondaryContainer = DarkInkPrimary,
     background = DarkBackground,
-    onBackground = DarkTextPrimary,
+    onBackground = DarkInkPrimary,
     surface = DarkSurface,
-    onSurface = DarkTextPrimary,
+    onSurface = DarkInkPrimary,
     surfaceVariant = DarkSurfaceVariant,
-    onSurfaceVariant = DarkTextSecondary,
+    onSurfaceVariant = DarkInkSecondary,
     outline = DarkBorder,
     outlineVariant = DarkBorder,
-    error = ErrorRed,
-    errorContainer = ErrorRedContainer,
-    onError = LightSurface,
-    onErrorContainer = DarkTextPrimary
+    error = ErrorRedDark,
+    errorContainer = ErrorContainerDark,
+    onError = DarkBackground,
+    onErrorContainer = ErrorRedDark
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = PrimaryIndigo,
+    primary = LightAccent,
     onPrimary = LightSurface,
-    primaryContainer = Color(0xFFE0E7FF),
-    onPrimaryContainer = PrimaryIndigoVariant,
-    secondary = SecondaryViolet,
+    primaryContainer = LightAccentContainer,
+    onPrimaryContainer = LightInkPrimary,
+    secondary = LightInkSecondary,
     onSecondary = LightSurface,
-    tertiary = TertiaryCyan,
+    secondaryContainer = LightSurfaceVariant,
+    onSecondaryContainer = LightInkPrimary,
     background = LightBackground,
-    onBackground = LightTextPrimary,
+    onBackground = LightInkPrimary,
     surface = LightSurface,
-    onSurface = LightTextPrimary,
+    onSurface = LightInkPrimary,
     surfaceVariant = LightSurfaceVariant,
-    onSurfaceVariant = LightTextSecondary,
+    onSurfaceVariant = LightInkSecondary,
     outline = LightBorder,
     outlineVariant = LightBorder,
-    error = ErrorRed,
-    errorContainer = Color(0xFFFFE4E6),
+    error = ErrorRedLight,
+    errorContainer = ErrorContainerLight,
     onError = LightSurface,
-    onErrorContainer = ErrorRed
+    onErrorContainer = ErrorRedLight
 )
 
 @Composable

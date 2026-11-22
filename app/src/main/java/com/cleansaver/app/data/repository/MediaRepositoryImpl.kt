@@ -11,7 +11,7 @@ import com.cleansaver.app.domain.model.ParsedUrl
 import com.cleansaver.app.domain.repository.MediaRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.withContext
 
 class MediaRepositoryImpl(
@@ -28,39 +28,42 @@ class MediaRepositoryImpl(
         downloadedMediaDao.findExisting(shortcode, 0) != null
     }
 
-    override fun downloadCandidates(candidates: List<MediaCandidate>): Flow<Map<Int, DownloadProgress>> = flow {
-        val progressMap = candidates.indices.associateWith { DownloadProgress.Queued as DownloadProgress }.toMutableMap()
-        emit(progressMap.toMap())
+    override fun downloadCandidates(candidates: List<MediaCandidate>): Flow<Map<Int, DownloadProgress>> = channelFlow {
+        val progressMap = candidates.associate { it.slideIndex to (DownloadProgress.Queued as DownloadProgress) }.toMutableMap()
+        send(progressMap.toMap())
 
         for (candidate in candidates) {
-            val index = candidate.slideIndex
-            progressMap[index] = DownloadProgress.Running(bytesRead = 0, totalBytes = 0, percent = 0)
-            emit(progressMap.toMap())
+            val key = candidate.slideIndex
+            progressMap[key] = DownloadProgress.Running(bytesRead = 0, totalBytes = 0, percent = 0)
+            send(progressMap.toMap())
 
             val result = mediaStoreWriter.downloadToGallery(candidate) { bytesRead, totalBytes, percent ->
-                progressMap[index] = DownloadProgress.Running(bytesRead, totalBytes, percent)
+                progressMap[key] = DownloadProgress.Running(bytesRead, totalBytes, percent)
+                trySend(progressMap.toMap())
             }
 
             if (result.isSuccess) {
                 val meta = result.getOrThrow()
-                downloadedMediaDao.upsert(
-                    DownloadedMediaEntity(
-                        shortcode = candidate.shortcode,
-                        slideIndex = candidate.slideIndex,
-                        mediaType = candidate.mediaType.name,
-                        mediaStoreUri = meta.mediaStoreUri,
-                        fileName = meta.fileName,
-                        fileSizeBytes = meta.fileSize,
-                        sourceUrl = "https://www.instagram.com/p/${candidate.shortcode}/",
-                        createdAtMs = System.currentTimeMillis()
+                withContext(Dispatchers.IO) {
+                    downloadedMediaDao.upsert(
+                        DownloadedMediaEntity(
+                            shortcode = candidate.shortcode,
+                            slideIndex = candidate.slideIndex,
+                            mediaType = candidate.mediaType.name,
+                            mediaStoreUri = meta.mediaStoreUri,
+                            fileName = meta.fileName,
+                            fileSizeBytes = meta.fileSize,
+                            sourceUrl = "https://www.instagram.com/p/${candidate.shortcode}/",
+                            createdAtMs = System.currentTimeMillis()
+                        )
                     )
-                )
-                progressMap[index] = DownloadProgress.Completed(meta.mediaStoreUri, meta.fileName)
+                }
+                progressMap[key] = DownloadProgress.Completed(meta.mediaStoreUri, meta.fileName)
             } else {
                 val errorMsg = result.exceptionOrNull()?.message ?: "Unknown download error"
-                progressMap[index] = DownloadProgress.Failed(AppError.StorageError(errorMsg))
+                progressMap[key] = DownloadProgress.Failed(AppError.StorageError(errorMsg))
             }
-            emit(progressMap.toMap())
+            send(progressMap.toMap())
         }
     }
 }

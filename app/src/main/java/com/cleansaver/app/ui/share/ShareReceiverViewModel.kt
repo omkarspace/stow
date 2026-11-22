@@ -49,7 +49,7 @@ class ShareReceiverViewModel(
                 _uiState.value = ShareSheetUiState.PreviewReady(candidates)
             } else {
                 val error = (extraction.exceptionOrNull() as? CustomThrowable)?.appError
-                    ?: AppError.Unknown("Failed to extract media")
+                    ?: AppError.Unknown(extraction.exceptionOrNull()?.message ?: "Failed to extract media")
                 _uiState.value = ShareSheetUiState.Error(error)
             }
         }
@@ -59,15 +59,24 @@ class ShareReceiverViewModel(
         if (candidates.isEmpty()) return
 
         viewModelScope.launch {
-            val progressMap = candidates.indices.associateWith { DownloadProgress.Queued as DownloadProgress }
-            _uiState.value = ShareSheetUiState.Downloading(progressMap)
+            val initialMap = candidates.associate { it.slideIndex to (DownloadProgress.Queued as DownloadProgress) }
+            _uiState.value = ShareSheetUiState.Downloading(initialMap)
 
             downloadMediaUseCase(candidates).collect { currentMap ->
-                val allCompleted = currentMap.values.all { it is DownloadProgress.Completed }
-                if (allCompleted) {
-                    _uiState.value = ShareSheetUiState.Completed(currentMap.size)
-                } else {
-                    _uiState.value = ShareSheetUiState.Downloading(currentMap)
+                val allCompleted = currentMap.isNotEmpty() && currentMap.values.all { it is DownloadProgress.Completed }
+                val firstFailure = currentMap.values.filterIsInstance<DownloadProgress.Failed>().firstOrNull()
+                val anyRunning = currentMap.values.any { it is DownloadProgress.Queued || it is DownloadProgress.Running }
+
+                when {
+                    allCompleted -> {
+                        _uiState.value = ShareSheetUiState.Completed(currentMap.size)
+                    }
+                    !anyRunning && firstFailure != null -> {
+                        _uiState.value = ShareSheetUiState.Error(firstFailure.error)
+                    }
+                    else -> {
+                        _uiState.value = ShareSheetUiState.Downloading(currentMap)
+                    }
                 }
             }
         }
@@ -87,4 +96,3 @@ class ShareReceiverViewModel(
             }
     }
 }
-

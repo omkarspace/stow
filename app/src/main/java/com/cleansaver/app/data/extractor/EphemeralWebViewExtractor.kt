@@ -1,6 +1,8 @@
 package com.cleansaver.app.data.extractor
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -31,8 +33,14 @@ class EphemeralWebViewExtractor(
     ): Result<List<MediaCandidate>> = withContext(Dispatchers.Main) {
         var webView: WebView? = null
         try {
+            val targetUrl = strategyConfig.endpointTemplate
+                .takeIf { it.isNotBlank() }
+                ?.replace("{shortcode}", parsedUrl.shortcode)
+                ?: parsedUrl.canonicalUrl
+
             withTimeout(strategyConfig.timeoutMs) {
                 suspendCancellableCoroutine { continuation ->
+                    val mainHandler = Handler(Looper.getMainLooper())
                     webView = WebView(context).apply {
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
@@ -49,7 +57,8 @@ class EphemeralWebViewExtractor(
                                 val url = request?.url?.toString() ?: ""
                                 if (url.contains("google-analytics.com") ||
                                     url.contains("facebook.net") ||
-                                    url.endsWith(".ttf")
+                                    url.endsWith(".ttf") ||
+                                    url.endsWith(".woff2")
                                 ) {
                                     return WebResourceResponse("text/plain", "UTF-8", null)
                                 }
@@ -57,37 +66,63 @@ class EphemeralWebViewExtractor(
                             }
 
                             override fun onPageFinished(view: WebView?, url: String?) {
-                                evaluateJavascript(
-                                    "(function() { return document.querySelector('meta[property=\"og:video\"]')?.content || document.querySelector('meta[property=\"og:image\"]')?.content || ''; })();"
-                                ) { result ->
-                                    val extractedUrl = result?.trim('"', '\'')?.replace("\\/", "/") ?: ""
-                                    if (extractedUrl.isNotBlank() && extractedUrl != "null") {
-                                        val type = if (extractedUrl.contains(".mp4") || extractedUrl.contains("video")) {
-                                            MediaType.VIDEO
-                                        } else {
-                                            MediaType.IMAGE
+                                // Brief delay lets SPA scripts populate <video> / meta tags
+                                mainHandler.postDelayed({
+                                    if (!continuation.isActive) return@postDelayed
+                                    val js = """
+                                        (function() {
+                                            var video = document.querySelector('meta[property="og:video"]')?.content
+                                                || document.querySelector('video')?.src
+                                                || '';
+                                            var image = document.querySelector('meta[property="og:image"]')?.content
+                                                || document.querySelector('img.EmbeddedMediaImage')?.src
+                                                || '';
+                                            return video + '|||' + image;
+                                        })();
+                                    """.trimIndent()
+                                    view?.evaluateJavascript(js) { rawResult ->
+                                        if (!continuation.isActive) return@evaluateJavascript
+                                        val cleaned = rawResult
+                                            ?.trim('"', '\'')
+                                            ?.replace("\\/", "/")
+                                            ?.replace("\\u0026", "&")
+                                            ?: ""
+                                        val parts = cleaned.split("|||")
+                                        val videoUrl = parts.getOrNull(0)?.trim().orEmpty()
+                                        val imageUrl = parts.getOrNull(1)?.trim().orEmpty()
+
+                                        val candidate = when {
+                                            videoUrl.startsWith("http") -> MediaCandidate(
+                                                shortcode = parsedUrl.shortcode,
+                                                slideIndex = 0,
+                                                mediaType = MediaType.VIDEO,
+                                                downloadUrl = videoUrl,
+                                                thumbnailUrl = imageUrl.takeIf { it.startsWith("http") },
+                                                width = null,
+                                                height = null
+                                            )
+                                            imageUrl.startsWith("http") -> MediaCandidate(
+                                                shortcode = parsedUrl.shortcode,
+                                                slideIndex = 0,
+                                                mediaType = MediaType.IMAGE,
+                                                downloadUrl = imageUrl,
+                                                thumbnailUrl = imageUrl,
+                                                width = null,
+                                                height = null
+                                            )
+                                            else -> null
                                         }
-                                        val candidate = MediaCandidate(
-                                            shortcode = parsedUrl.shortcode,
-                                            slideIndex = 0,
-                                            mediaType = type,
-                                            downloadUrl = extractedUrl,
-                                            thumbnailUrl = null,
-                                            width = null,
-                                            height = null
-                                        )
-                                        if (continuation.isActive) {
+
+                                        if (candidate != null) {
                                             continuation.resume(Result.success(listOf(candidate)))
-                                        }
-                                    } else {
-                                        if (continuation.isActive) {
+                                        } else {
                                             continuation.resume(Result.failure(CustomThrowable(AppError.ParserOutdated)))
                                         }
                                     }
-                                }
+                                }, 800L)
                             }
                         }
-                        loadUrl(parsedUrl.canonicalUrl)
+                        loadUrl(targetUrl)
                     }
                 }
             }
@@ -102,4 +137,3 @@ class EphemeralWebViewExtractor(
         }
     }
 }
-

@@ -47,6 +47,7 @@ class HomeViewModel(
             _uiState.update {
                 it.copy(
                     isValidating = true,
+                    isDownloading = false,
                     error = null,
                     extractedCandidates = emptyList(),
                     selectedIndices = emptySet(),
@@ -73,7 +74,7 @@ class HomeViewModel(
                         isExtracting = false,
                         extractedCandidates = candidates,
                         selectedIndices = candidates.indices.toSet(),
-                        downloadProgressMap = candidates.indices.associateWith { DownloadProgress.Queued }
+                        downloadProgressMap = emptyMap()
                     )
                 }
             } else {
@@ -123,10 +124,19 @@ class HomeViewModel(
                 }
             }
 
-            _uiState.update { it.copy(showDuplicatePrompt = false) }
-            downloadMediaUseCase(candidatesToDownload).collect { progressMap ->
-                _uiState.update { it.copy(downloadProgressMap = progressMap) }
+            _uiState.update { it.copy(showDuplicatePrompt = false, isDownloading = true) }
+            downloadMediaUseCase(candidatesToDownload).collect { progressBySlide ->
+                val isStillRunning = progressBySlide.values.any {
+                    it is DownloadProgress.Queued || it is DownloadProgress.Running
+                }
+                _uiState.update { state ->
+                    state.copy(
+                        isDownloading = isStillRunning,
+                        downloadProgressMap = state.downloadProgressMap + progressBySlide
+                    )
+                }
             }
+            _uiState.update { it.copy(isDownloading = false) }
         }
     }
 

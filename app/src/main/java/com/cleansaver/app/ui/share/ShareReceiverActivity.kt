@@ -5,10 +5,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,10 +15,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ErrorOutline
@@ -28,8 +24,6 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -45,17 +39,16 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.cleansaver.app.CleanSaverApplication
-import com.cleansaver.app.domain.model.AppError
 import com.cleansaver.app.domain.model.DownloadProgress
 import com.cleansaver.app.domain.model.MediaType
+import com.cleansaver.app.ui.home.formatAppError
 import com.cleansaver.app.ui.state.ShareSheetUiState
 import com.cleansaver.app.ui.theme.CleanSaverTheme
-import com.cleansaver.app.ui.theme.PrimaryIndigo
-import com.cleansaver.app.ui.theme.SuccessGreen
+import com.cleansaver.app.ui.theme.SuccessGreenDark
+import com.cleansaver.app.ui.theme.SuccessGreenLight
 import kotlinx.coroutines.delay
 
 class ShareReceiverActivity : ComponentActivity() {
@@ -76,8 +69,17 @@ class ShareReceiverActivity : ComponentActivity() {
 
         viewModel.handleSharedContent(sharedText)
 
+        val app = application as CleanSaverApplication
+
         setContent {
-            CleanSaverTheme {
+            val themeMode by app.container.userPrefsRepository.themeMode.collectAsState(initial = "SYSTEM")
+            val darkTheme = when (themeMode) {
+                "LIGHT" -> false
+                "DARK" -> true
+                else -> isSystemInDarkTheme()
+            }
+
+            CleanSaverTheme(darkTheme = darkTheme) {
                 ShareReceiverSheet(
                     viewModel = viewModel,
                     onDismiss = { finish() }
@@ -95,10 +97,11 @@ fun ShareReceiverSheet(
 ) {
     val state by viewModel.uiState.collectAsState()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val successColor = if (isSystemInDarkTheme()) SuccessGreenDark else SuccessGreenLight
 
     LaunchedEffect(state) {
         if (state is ShareSheetUiState.Completed) {
-            delay(1200)
+            delay(1100)
             onDismiss()
         }
     }
@@ -106,69 +109,48 @@ fun ShareReceiverSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
         containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 18.dp)
+                .padding(horizontal = 24.dp, vertical = 12.dp)
         ) {
-            // Header with Pill
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = PrimaryIndigo.copy(alpha = 0.15f),
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Bolt,
-                        contentDescription = null,
-                        tint = PrimaryIndigo,
-                        modifier = Modifier.padding(8.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                Column {
-                    Text(
-                        text = "CleanSaver Quick Save",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Instant 1-tap download directly to gallery",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            Text(
+                text = "CleanSaver",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "Save directly to gallery",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             when (val s = state) {
                 is ShareSheetUiState.Idle, is ShareSheetUiState.Loading -> {
-                    Card(
+                    Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
                     ) {
                         Row(
-                            modifier = Modifier.padding(18.dp),
+                            modifier = Modifier.padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
+                                modifier = Modifier.size(20.dp),
                                 color = MaterialTheme.colorScheme.primary,
-                                strokeWidth = 2.5.dp
+                                strokeWidth = 2.dp
                             )
-                            Spacer(modifier = Modifier.width(14.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                text = "Resolving Instagram streams on-device...",
+                                text = "Fetching media...",
                                 style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -176,21 +158,21 @@ fun ShareReceiverSheet(
 
                 is ShareSheetUiState.PreviewReady -> {
                     Text(
-                        text = "Found ${s.candidates.size} item${if (s.candidates.size > 1) "s" else ""}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        text = if (s.candidates.size == 1) "1 item ready" else "${s.candidates.size} items ready",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    s.candidates.forEach { candidate ->
-                        Card(
+                    s.candidates.forEachIndexed { idx, candidate ->
+                        Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                                .padding(vertical = 3.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.background,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -199,108 +181,116 @@ fun ShareReceiverSheet(
                                 Icon(
                                     imageVector = if (candidate.mediaType == MediaType.VIDEO) Icons.Default.Videocam else Icons.Default.Image,
                                     contentDescription = null,
-                                    tint = PrimaryIndigo,
-                                    modifier = Modifier.size(20.dp)
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = "${candidate.mediaType.name} (${candidate.shortcode})",
+                                    text = "${if (candidate.mediaType == MediaType.VIDEO) "Video" else "Photo"} ${if (s.candidates.size > 1) "#${idx + 1}" else ""}".trim(),
                                     style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     Button(
                         onClick = { viewModel.startDownload(s.candidates) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                     ) {
-                        Icon(imageVector = Icons.Default.Download, contentDescription = null)
+                        Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Save to Gallery (${s.candidates.size} item${if (s.candidates.size > 1) "s" else ""})",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            text = if (s.candidates.size == 1) "Save to Gallery" else "Save ${s.candidates.size} items",
+                            style = MaterialTheme.typography.labelLarge
                         )
                     }
                 }
 
                 is ShareSheetUiState.Downloading -> {
-                    Card(
+                    Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                text = "Saving media directly to Gallery...",
+                                text = "Saving to gallery...",
                                 style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(10.dp))
-
-                            s.progressMap.values.forEach { progress ->
-                                if (progress is DownloadProgress.Running) {
-                                    LinearProgressIndicator(
-                                        progress = { progress.percent / 100f },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(6.dp),
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "${progress.percent}%",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
+                            val active = s.progressMap.values.filterIsInstance<DownloadProgress.Running>().firstOrNull()
+                            if (active != null && active.totalBytes > 0) {
+                                LinearProgressIndicator(
+                                    progress = { active.percent / 100f },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(4.dp)
+                                        .clip(RoundedCornerShape(2.dp)),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "${active.percent}%",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else {
+                                LinearProgressIndicator(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(4.dp)
+                                        .clip(RoundedCornerShape(2.dp)),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
                             }
                         }
                     }
                 }
 
                 is ShareSheetUiState.Completed -> {
-                    Card(
+                    Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = SuccessGreen.copy(alpha = 0.12f)),
-                        border = BorderStroke(1.dp, SuccessGreen.copy(alpha = 0.3f))
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
                     ) {
                         Row(
-                            modifier = Modifier.padding(18.dp),
+                            modifier = Modifier.padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = null,
-                                tint = SuccessGreen,
-                                modifier = Modifier.size(24.dp)
+                                tint = successColor,
+                                modifier = Modifier.size(20.dp)
                             )
-                            Spacer(modifier = Modifier.width(12.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "Saved ${s.savedCount} item(s) to Gallery!",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = SuccessGreen,
-                                fontWeight = FontWeight.Bold
+                                text = "Saved ${s.savedCount} item${if (s.savedCount > 1) "s" else ""} to gallery",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = successColor
                             )
                         }
                     }
                 }
 
                 is ShareSheetUiState.Error -> {
-                    Card(
+                    Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f))
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.25f))
                     ) {
                         Row(
                             modifier = Modifier.padding(16.dp),
@@ -310,23 +300,12 @@ fun ShareReceiverSheet(
                                 imageVector = Icons.Default.ErrorOutline,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(20.dp)
                             )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            val message = when (val err = s.appError) {
-                                is AppError.InvalidUrl -> "Invalid Instagram URL."
-                                is AppError.StoriesNotSupported -> "Stories are private/ephemeral."
-                                is AppError.PrivateAccountNotSupported -> "Account is private."
-                                is AppError.PostNotFound -> "Post removed or not found."
-                                is AppError.NetworkRateLimited -> "Rate limit reached."
-                                is AppError.ParserOutdated -> "Parser rules need update."
-                                is AppError.NoInternet -> "No internet connection."
-                                is AppError.StorageError -> err.reason
-                                is AppError.Unknown -> err.message
-                            }
+                            Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = message,
-                                style = MaterialTheme.typography.bodyMedium,
+                                text = formatAppError(s.appError),
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
                         }
@@ -334,7 +313,7 @@ fun ShareReceiverSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }

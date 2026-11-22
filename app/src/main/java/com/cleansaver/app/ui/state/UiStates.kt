@@ -9,6 +9,7 @@ data class HomeUiState(
     val inputUrl: String = "",
     val isValidating: Boolean = false,
     val isExtracting: Boolean = false,
+    val isDownloading: Boolean = false,
     val extractedCandidates: List<MediaCandidate> = emptyList(),
     val selectedIndices: Set<Int> = emptySet(),
     val downloadProgressMap: Map<Int, DownloadProgress> = emptyMap(),
@@ -27,7 +28,12 @@ sealed interface ShareSheetUiState {
 
 data class LibraryUiState(
     val filterType: String = "ALL", // "ALL", "VIDEO", "IMAGE"
+    val searchQuery: String = "",
     val items: List<DownloadedMediaEntity> = emptyList(),
+    val totalCount: Int = 0,
+    val videoCount: Int = 0,
+    val imageCount: Int = 0,
+    val totalSizeBytes: Long = 0L,
     val isLoading: Boolean = false
 )
 
@@ -35,7 +41,9 @@ data class SettingsUiState(
     val themeMode: String = "SYSTEM",
     val clipboardAutoDetect: Boolean = false,
     val fairUseAccepted: Boolean = false,
+    val isLoaded: Boolean = false,
     val isRefreshingConfig: Boolean = false,
     val configRefreshMessage: String? = null,
+    val configRefreshSuccess: Boolean = true,
     val appVersion: String = "1.0.0"
 )

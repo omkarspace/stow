@@ -3,6 +3,8 @@ package com.cleansaver.app.ui.home
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -11,6 +13,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,7 +31,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ContentPaste
@@ -37,12 +39,11 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -64,7 +65,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -76,14 +76,14 @@ import com.cleansaver.app.domain.model.DownloadProgress
 import com.cleansaver.app.domain.model.MediaCandidate
 import com.cleansaver.app.domain.model.MediaType
 import com.cleansaver.app.ui.components.MediaPreviewDialog
-import com.cleansaver.app.ui.theme.BrandGradient
-import com.cleansaver.app.ui.theme.PrimaryIndigo
-import com.cleansaver.app.ui.theme.SuccessGreen
+import com.cleansaver.app.ui.theme.SuccessGreenDark
+import com.cleansaver.app.ui.theme.SuccessGreenLight
 
 @Composable
 fun HomeScreen(viewModel: HomeViewModel) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val successColor = if (isSystemInDarkTheme()) SuccessGreenDark else SuccessGreenLight
     var previewCandidate by remember { mutableStateOf<MediaCandidate?>(null) }
 
     Column(
@@ -92,73 +92,54 @@ fun HomeScreen(viewModel: HomeViewModel) {
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 24.dp)
     ) {
-        // Feature Pill Badge
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
-            modifier = Modifier.padding(bottom = 12.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Bolt,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "Zero Ads • Zero Logins • On-Device",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-
-        // Hero Typography
+        // Minimal Header
         Text(
             text = "CleanSaver",
             style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.onBackground
         )
         Text(
-            text = "Save public Instagram Reels, photos, and carousels directly to your gallery in full original quality.",
+            text = "Save public Reels, posts, and carousels directly to your gallery.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
         )
 
-        // URL Input Card
-        Card(
+        // Minimal Input Surface
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 OutlinedTextField(
                     value = state.inputUrl,
                     onValueChange = { viewModel.onUrlChanged(it) },
-                    label = { Text("Instagram Link") },
-                    placeholder = { Text("https://www.instagram.com/reel/...") },
+                    placeholder = {
+                        Text(
+                            text = "Paste Instagram link...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.Link,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
                         )
                     },
                     trailingIcon = {
                         if (state.inputUrl.isNotEmpty()) {
                             IconButton(onClick = { viewModel.onUrlChanged("") }) {
-                                Icon(imageVector = Icons.Default.Clear, contentDescription = "Clear")
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = "Clear",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
                             }
                         } else {
                             IconButton(onClick = {
@@ -173,47 +154,52 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 Icon(
                                     imageVector = Icons.Default.ContentPaste,
                                     contentDescription = "Paste",
-                                    tint = MaterialTheme.colorScheme.primary
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
                     },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        focusedContainerColor = MaterialTheme.colorScheme.background,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.background
                     )
                 )
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Button(
                     onClick = { viewModel.onExtract() },
                     enabled = state.inputUrl.isNotBlank() && !state.isValidating && !state.isExtracting,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(14.dp),
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                 ) {
                     if (state.isValidating || state.isExtracting) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(18.dp),
                             color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.5.dp
+                            strokeWidth = 2.dp
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = if (state.isValidating) "Validating Link..." else "Parsing Media Streams...",
+                            text = if (state.isValidating) "Validating..." else "Fetching media...",
                             style = MaterialTheme.typography.labelLarge
                         )
                     } else {
                         Text(
-                            text = "Extract Media",
+                            text = "Extract",
                             style = MaterialTheme.typography.labelLarge
                         )
                     }
@@ -221,54 +207,75 @@ fun HomeScreen(viewModel: HomeViewModel) {
             }
         }
 
-        // Animated Error Banner
+        // Subtle Idle Tip (only when no error and no extracted items)
+        if (state.extractedCandidates.isEmpty() && state.error == null && !state.isExtracting && !state.isValidating) {
+            Spacer(modifier = Modifier.height(20.dp))
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Quick tip",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Share any public Reel, post, or carousel directly from Instagram to CleanSaver for one-tap saving. No login required.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        // Error Banner
         AnimatedVisibility(
             visible = state.error != null,
             enter = fadeIn() + expandVertically(),
             exit = fadeOut() + shrinkVertically()
         ) {
             state.error?.let { err ->
-                Card(
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 16.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f))
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.25f))
                 ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ErrorOutline,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(28.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.ErrorOutline,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "Unable to Extract",
+                                text = "Could not extract media",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onErrorContainer
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.weight(1f)
                             )
-                            Text(
-                                text = when (err) {
-                                    is AppError.InvalidUrl -> "Please provide a valid public Reel or Post URL."
-                                    is AppError.StoriesNotSupported -> "Saving Stories is private/ephemeral and not supported."
-                                    is AppError.PrivateAccountNotSupported -> "Media from private accounts cannot be saved."
-                                    is AppError.PostNotFound -> "Post not found or has been deleted."
-                                    is AppError.NetworkRateLimited -> "Rate limit reached. Please wait a moment."
-                                    is AppError.ParserOutdated -> "Parser rules need an update. Refresh in Settings."
-                                    is AppError.NoInternet -> "No internet connection available."
-                                    is AppError.StorageError -> "Storage error: ${err.reason}"
-                                    is AppError.Unknown -> err.message
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer
-                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = formatAppError(err),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.9f)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = { viewModel.onExtract() }) {
+                                Text("Retry", color = MaterialTheme.colorScheme.error)
+                            }
+                            TextButton(onClick = { viewModel.dismissError() }) {
+                                Text("Dismiss", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                 }
@@ -281,7 +288,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
             enter = fadeIn() + expandVertically(),
             exit = fadeOut() + shrinkVertically()
         ) {
-            Column(modifier = Modifier.padding(top = 28.dp)) {
+            Column(modifier = Modifier.padding(top = 24.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -289,14 +296,17 @@ fun HomeScreen(viewModel: HomeViewModel) {
                 ) {
                     Column {
                         Text(
-                            text = "Media Found",
-                            style = MaterialTheme.typography.titleLarge
+                            text = if (state.extractedCandidates.size == 1) "Ready to save" else "Carousel (${state.extractedCandidates.size} items)",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onBackground
                         )
-                        Text(
-                            text = "${state.selectedIndices.size} of ${state.extractedCandidates.size} items selected",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        if (state.extractedCandidates.size > 1) {
+                            Text(
+                                text = "${state.selectedIndices.size} selected",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
 
                     if (state.extractedCandidates.size > 1) {
@@ -310,30 +320,39 @@ fun HomeScreen(viewModel: HomeViewModel) {
                             }
                         ) {
                             Text(
-                                text = if (state.selectedIndices.size == state.extractedCandidates.size) "Deselect All" else "Select All",
-                                fontWeight = FontWeight.Bold
+                                text = if (state.selectedIndices.size == state.extractedCandidates.size) "Deselect all" else "Select all",
+                                style = MaterialTheme.typography.labelMedium
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 state.extractedCandidates.forEachIndexed { index, candidate ->
                     val isSelected = state.selectedIndices.contains(index)
+                    val progress = state.downloadProgressMap[candidate.slideIndex]
 
-                    Card(
+                    Surface(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 6.dp)
-                            .clickable { viewModel.toggleCandidateSelection(index) },
-                        shape = RoundedCornerShape(18.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isSelected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
-                        ),
+                            .clickable {
+                                if (state.extractedCandidates.size > 1) {
+                                    viewModel.toggleCandidateSelection(index)
+                                } else {
+                                    previewCandidate = candidate
+                                }
+                            },
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surface,
                         border = BorderStroke(
-                            width = if (isSelected) 1.5.dp else 1.dp,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                            width = if (isSelected && state.extractedCandidates.size > 1) 1.5.dp else 1.dp,
+                            color = if (isSelected && state.extractedCandidates.size > 1) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.outline
+                            }
                         )
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
@@ -345,14 +364,16 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                     Checkbox(
                                         checked = isSelected,
                                         onCheckedChange = { viewModel.toggleCandidateSelection(index) },
-                                        colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
+                                        colors = CheckboxDefaults.colors(
+                                            checkedColor = MaterialTheme.colorScheme.primary,
+                                            checkmarkColor = MaterialTheme.colorScheme.onPrimary
+                                        )
                                     )
-                                    Spacer(modifier = Modifier.width(6.dp))
                                 }
 
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (candidate.mediaType == MediaType.VIDEO) PrimaryIndigo.copy(alpha = 0.15f) else Color(0xFF06B6D4).copy(alpha = 0.15f)
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -361,120 +382,175 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                         Icon(
                                             imageVector = if (candidate.mediaType == MediaType.VIDEO) Icons.Default.Videocam else Icons.Default.Image,
                                             contentDescription = null,
-                                            tint = if (candidate.mediaType == MediaType.VIDEO) PrimaryIndigo else Color(0xFF06B6D4),
-                                            modifier = Modifier.size(16.dp)
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(14.dp)
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
-                                            text = "${candidate.mediaType.name} #${index + 1}",
+                                            text = if (candidate.mediaType == MediaType.VIDEO) "Video" else "Photo",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = if (candidate.mediaType == MediaType.VIDEO) PrimaryIndigo else Color(0xFF06B6D4)
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.weight(1f))
+                                Spacer(modifier = Modifier.width(8.dp))
 
                                 Text(
-                                    text = candidate.shortcode,
+                                    text = if (state.extractedCandidates.size > 1) "Slide ${index + 1}" else candidate.shortcode,
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.weight(1f)
                                 )
+
+                                TextButton(onClick = { previewCandidate = candidate }) {
+                                    Text(
+                                        text = "Preview",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
                             }
 
-                            candidate.thumbnailUrl?.let { thumb ->
-                                Spacer(modifier = Modifier.height(10.dp))
+                            val previewImageUrl = candidate.thumbnailUrl
+                                ?: candidate.downloadUrl.takeIf { candidate.mediaType == MediaType.IMAGE }
+
+                            if (previewImageUrl != null) {
+                                Spacer(modifier = Modifier.height(8.dp))
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .aspectRatio(16f / 9f)
-                                        .clip(RoundedCornerShape(12.dp))
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
                                         .clickable { previewCandidate = candidate }
                                 ) {
                                     AsyncImage(
-                                        model = thumb,
-                                        contentDescription = "Thumbnail",
+                                        model = previewImageUrl,
+                                        contentDescription = "Media preview",
                                         modifier = Modifier.fillMaxSize(),
                                         contentScale = ContentScale.Crop
                                     )
-                                    // Gradient Scrim & Play Button overlay
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(
-                                                Brush.verticalGradient(
-                                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))
-                                                )
+                                    if (candidate.mediaType == MediaType.VIDEO) {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = Color.Black.copy(alpha = 0.65f),
+                                            modifier = Modifier
+                                                .size(44.dp)
+                                                .align(Alignment.Center)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.PlayArrow,
+                                                contentDescription = "Play Preview",
+                                                tint = Color.White,
+                                                modifier = Modifier.padding(10.dp)
                                             )
-                                    )
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = Color.Black.copy(alpha = 0.6f),
-                                        modifier = Modifier
-                                            .size(44.dp)
-                                            .align(Alignment.Center)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.PlayArrow,
-                                            contentDescription = "Play Preview",
-                                            tint = Color.White,
-                                            modifier = Modifier.padding(10.dp)
-                                        )
+                                        }
                                     }
                                 }
                             }
 
-                            // Download Progress Indicator
-                            val progress = state.downloadProgressMap[index]
                             if (progress != null) {
                                 Spacer(modifier = Modifier.height(10.dp))
                                 when (progress) {
-                                    is DownloadProgress.Running -> {
-                                        LinearProgressIndicator(
-                                            progress = { progress.percent / 100f },
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(6.dp)
-                                                .clip(RoundedCornerShape(3.dp)),
-                                            color = MaterialTheme.colorScheme.primary
+                                    is DownloadProgress.Queued -> {
+                                        Text(
+                                            text = "Queued...",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
-                                        Spacer(modifier = Modifier.height(4.dp))
+                                    }
+                                    is DownloadProgress.Running -> {
+                                        if (progress.totalBytes > 0) {
+                                            LinearProgressIndicator(
+                                                progress = { progress.percent / 100f },
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(4.dp)
+                                                    .clip(RoundedCornerShape(2.dp)),
+                                                color = MaterialTheme.colorScheme.primary,
+                                                trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                            )
+                                        } else {
+                                            LinearProgressIndicator(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(4.dp)
+                                                    .clip(RoundedCornerShape(2.dp)),
+                                                color = MaterialTheme.colorScheme.primary,
+                                                trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(6.dp))
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
                                             Text(
-                                                text = "Downloading...",
+                                                text = "Saving...",
                                                 style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.primary
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                             Text(
-                                                text = "${progress.percent}% (${progress.bytesRead / 1024} KB)",
-                                                style = MaterialTheme.typography.labelSmall
+                                                text = if (progress.totalBytes > 0) {
+                                                    "${progress.percent}% · ${formatBytes(progress.bytesRead)}"
+                                                } else {
+                                                    formatBytes(progress.bytesRead)
+                                                },
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
                                     }
                                     is DownloadProgress.Completed -> {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                imageVector = Icons.Default.CheckCircle,
-                                                contentDescription = null,
-                                                tint = SuccessGreen,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                text = "Saved to Gallery (${progress.fileName})",
-                                                style = MaterialTheme.typography.labelMedium,
-                                                color = SuccessGreen,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.CheckCircle,
+                                                    contentDescription = null,
+                                                    tint = successColor,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = "Saved to Gallery",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = successColor
+                                                )
+                                            }
+                                            IconButton(
+                                                onClick = {
+                                                    try {
+                                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                            type = if (candidate.mediaType == MediaType.VIDEO) "video/*" else "image/*"
+                                                            putExtra(Intent.EXTRA_STREAM, Uri.parse(progress.mediaStoreUri))
+                                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                        }
+                                                        context.startActivity(Intent.createChooser(shareIntent, "Share Media"))
+                                                    } catch (_: Exception) {}
+                                                },
+                                                modifier = Modifier.size(32.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Share,
+                                                    contentDescription = "Share saved file",
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
                                         }
                                     }
                                     is DownloadProgress.Failed -> {
                                         Text(
-                                            text = "Download failed: ${progress.error}",
-                                            style = MaterialTheme.typography.labelMedium,
+                                            text = "Failed: ${formatAppError(progress.error)}",
+                                            style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.error
                                         )
                                     }
@@ -485,66 +561,83 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     }
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Sticky/Prominent Save Action Button
                 Button(
                     onClick = { viewModel.onDownload(force = false) },
-                    enabled = state.selectedIndices.isNotEmpty(),
+                    enabled = state.selectedIndices.isNotEmpty() && !state.isDownloading,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(54.dp),
-                    shape = RoundedCornerShape(16.dp),
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     ),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                 ) {
-                    Icon(imageVector = Icons.Default.Download, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Save to Gallery (${state.selectedIndices.size} item${if (state.selectedIndices.size > 1) "s" else ""})",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    if (state.isDownloading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Saving to Gallery...", style = MaterialTheme.typography.labelLarge)
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (state.selectedIndices.size == 1) {
+                                "Save to Gallery"
+                            } else {
+                                "Save ${state.selectedIndices.size} items to Gallery"
+                            },
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
                 }
             }
         }
     }
 
-    // In-app media preview modal
     previewCandidate?.let { candidate ->
         MediaPreviewDialog(
             mediaUriOrUrl = candidate.downloadUrl,
             isVideo = candidate.mediaType == MediaType.VIDEO,
-            title = "${candidate.mediaType.name} (${candidate.shortcode})",
+            title = if (candidate.mediaType == MediaType.VIDEO) "Video Preview" else "Photo Preview",
             onDismiss = { previewCandidate = null }
         )
     }
 
-    // FR-4 Deduplication Confirmation Dialog
     if (state.showDuplicatePrompt) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissDuplicatePrompt() },
+            containerColor = MaterialTheme.colorScheme.surface,
             title = {
                 Text(
-                    text = "Item Already Saved",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
+                    text = "Already saved",
+                    style = MaterialTheme.typography.titleLarge
                 )
             },
             text = {
                 Text(
-                    text = "This item is already present in your gallery and library. Download another copy?",
-                    style = MaterialTheme.typography.bodyMedium
+                    text = "This post is already in your library. Save another copy?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
             confirmButton = {
                 Button(
                     onClick = { viewModel.onDownload(force = true) },
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                 ) {
-                    Text("Download Again")
+                    Text("Save again")
                 }
             },
             dismissButton = {
@@ -552,7 +645,27 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     Text("Cancel")
                 }
             },
-            shape = RoundedCornerShape(20.dp)
+            shape = RoundedCornerShape(16.dp)
         )
     }
+}
+
+internal fun formatAppError(err: AppError): String = when (err) {
+    is AppError.InvalidUrl -> "Enter a valid public Instagram Reel or Post link."
+    is AppError.StoriesNotSupported -> "Instagram Stories are private/ephemeral and not supported."
+    is AppError.PrivateAccountNotSupported -> "Media from private accounts cannot be accessed."
+    is AppError.PostNotFound -> "Post was not found or has been removed."
+    is AppError.NetworkRateLimited -> "Instagram rate-limited this request. Try again in a moment."
+    is AppError.ParserOutdated -> "Could not parse this post. Try syncing parser rules in Settings."
+    is AppError.NoInternet -> "No internet connection. Check your network and try again."
+    is AppError.StorageError -> "Storage error: ${err.reason}"
+    is AppError.Unknown -> err.message
+}
+
+internal fun formatBytes(bytes: Long): String {
+    if (bytes < 1024L) return "$bytes B"
+    val kb = bytes / 1024.0
+    if (kb < 1024.0) return String.format("%.0f KB", kb)
+    val mb = kb / 1024.0
+    return String.format("%.1f MB", mb)
 }
