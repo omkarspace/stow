@@ -5,6 +5,8 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
+import com.cleansaver.app.data.engine.DownloadQueueManager
+import com.cleansaver.app.data.engine.YtDlpEngine
 import com.cleansaver.app.data.extractor.EmbedHttpExtractor
 import com.cleansaver.app.data.extractor.EphemeralWebViewExtractor
 import com.cleansaver.app.data.extractor.MediaExtractorChain
@@ -119,6 +121,22 @@ class AppContainer(private val context: Context) {
 
     val mediaStoreWriter: MediaStoreWriter by lazy {
         MediaStoreWriter(context, okHttpClient)
+    }
+
+    val ytDlpEngine: YtDlpEngine by lazy {
+        YtDlpEngine(
+            context = context.applicationContext,
+            mediaStoreWriter = mediaStoreWriter,
+            downloadedMediaDao = downloadedMediaDao,
+            userPrefsRepository = userPrefsRepository
+        )
+    }
+
+    val downloadQueueManager: DownloadQueueManager by lazy {
+        DownloadQueueManager(
+            ytDlpEngine = ytDlpEngine,
+            applicationScope = applicationScope
+        )
     }
 
     val validateUrlUseCase: ValidateUrlUseCase by lazy {

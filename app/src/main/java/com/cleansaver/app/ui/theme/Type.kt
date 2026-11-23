@@ -2,42 +2,31 @@ package com.cleansaver.app.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.googlefonts.Font
-import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.unit.sp
 import com.cleansaver.app.R
 
-private val googleFontProvider = GoogleFont.Provider(
-    providerAuthority = "com.google.android.gms.fonts",
-    providerPackage = "com.google.android.gms",
-    certificates = R.array.com_google_android_gms_fonts_certs
-)
-
-private val spaceGroteskFont = GoogleFont("Space Grotesk")
-private val plusJakartaFont = GoogleFont("Plus Jakarta Sans")
-private val jetBrainsMonoFont = GoogleFont("JetBrains Mono")
-
+// Bundled Offline Neo-Swiss Typography (Zero Play Services fallback bugs)
 val StowDisplayFamily = FontFamily(
-    Font(googleFont = spaceGroteskFont, fontProvider = googleFontProvider, weight = FontWeight.Light),
-    Font(googleFont = spaceGroteskFont, fontProvider = googleFontProvider, weight = FontWeight.Normal),
-    Font(googleFont = spaceGroteskFont, fontProvider = googleFontProvider, weight = FontWeight.Medium),
-    Font(googleFont = spaceGroteskFont, fontProvider = googleFontProvider, weight = FontWeight.SemiBold)
+    Font(R.font.space_grotesk_light, FontWeight.Light),
+    Font(R.font.space_grotesk_regular, FontWeight.Normal),
+    Font(R.font.space_grotesk_medium, FontWeight.Medium),
+    Font(R.font.space_grotesk_semibold, FontWeight.SemiBold)
 )
 
 val StowBodyFamily = FontFamily(
-    Font(googleFont = plusJakartaFont, fontProvider = googleFontProvider, weight = FontWeight.Normal),
-    Font(googleFont = plusJakartaFont, fontProvider = googleFontProvider, weight = FontWeight.Medium),
-    Font(googleFont = plusJakartaFont, fontProvider = googleFontProvider, weight = FontWeight.SemiBold)
+    Font(R.font.plus_jakarta_sans_regular, FontWeight.Normal),
+    Font(R.font.plus_jakarta_sans_medium, FontWeight.Medium),
+    Font(R.font.plus_jakarta_sans_semibold, FontWeight.SemiBold)
 )
 
 val StowMonoFamily = FontFamily(
-    Font(googleFont = jetBrainsMonoFont, fontProvider = googleFontProvider, weight = FontWeight.Medium),
-    Font(googleFont = jetBrainsMonoFont, fontProvider = googleFontProvider, weight = FontWeight.SemiBold)
+    Font(R.font.jetbrains_mono_medium, FontWeight.Medium),
+    Font(R.font.jetbrains_mono_semibold, FontWeight.SemiBold)
 )
 
-// Neo-Swiss Editorial Typography with Tabular Numerals ("tnum")
 val Typography = Typography(
     displaySmall = TextStyle(
         fontFamily = StowDisplayFamily,
@@ -51,14 +40,14 @@ val Typography = Typography(
         fontFamily = StowDisplayFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 28.sp,
-        lineHeight = 34.sp,
+        lineHeight = 33.sp,
         letterSpacing = (-0.8).sp
     ),
     headlineMedium = TextStyle(
         fontFamily = StowDisplayFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 22.sp,
-        lineHeight = 28.sp,
+        lineHeight = 27.sp,
         letterSpacing = (-0.4).sp,
         fontFeatureSettings = "tnum"
     ),
@@ -66,12 +55,12 @@ val Typography = Typography(
         fontFamily = StowDisplayFamily,
         fontWeight = FontWeight.Medium,
         fontSize = 18.sp,
-        lineHeight = 24.sp,
+        lineHeight = 23.sp,
         letterSpacing = (-0.2).sp
     ),
     titleMedium = TextStyle(
         fontFamily = StowBodyFamily,
-        fontWeight = FontWeight.Medium,
+        fontWeight = FontWeight.SemiBold,
         fontSize = 15.sp,
         lineHeight = 20.sp
     ),

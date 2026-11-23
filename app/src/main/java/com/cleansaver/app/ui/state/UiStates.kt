@@ -1,5 +1,6 @@
 package com.cleansaver.app.ui.state
 
+import com.cleansaver.app.data.engine.StowMediaInfo
 import com.cleansaver.app.data.local.DownloadedMediaEntity
 import com.cleansaver.app.domain.model.AppError
 import com.cleansaver.app.domain.model.DownloadProgress
@@ -12,6 +13,7 @@ data class HomeUiState(
     val isExtracting: Boolean = false,
     val extractionStatus: String? = null,
     val isDownloading: Boolean = false,
+    val pendingMediaInfo: StowMediaInfo? = null,
     val extractedCandidates: List<MediaCandidate> = emptyList(),
     val selectedIndices: Set<Int> = emptySet(),
     val downloadProgressMap: Map<Int, DownloadProgress> = emptyMap(),
@@ -23,6 +25,8 @@ data class HomeUiState(
 sealed interface ShareSheetUiState {
     data object Idle : ShareSheetUiState
     data object Loading : ShareSheetUiState
+    data class FormatPickerReady(val mediaInfo: StowMediaInfo) : ShareSheetUiState
+    data class Enqueued(val title: String) : ShareSheetUiState
     data class PreviewReady(val candidates: List<MediaCandidate>) : ShareSheetUiState
     data class Downloading(val progressMap: Map<Int, DownloadProgress>) : ShareSheetUiState
     data class Completed(val savedCount: Int) : ShareSheetUiState
@@ -66,6 +70,9 @@ data class SettingsUiState(
     val isCheckingUpdate: Boolean = false,
     val updateInfo: ReleaseUpdateInfo? = null,
     val updateCheckMessage: String? = null,
+    val isUpdatingYtDlp: Boolean = false,
+    val ytDlpUpdateMessage: String? = null,
+    val ytDlpUpdateSuccess: Boolean = true,
     val diagnosticLogs: List<String> = emptyList(),
     val appVersion: String = "1.0.0"
 )

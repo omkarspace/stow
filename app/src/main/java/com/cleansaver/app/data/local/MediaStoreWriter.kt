@@ -59,12 +59,60 @@ class MediaStoreWriter(
         }
     }
 
-    private fun isOnWifi(): Boolean {
+    fun isOnWifi(): Boolean {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return true
         val network = cm.activeNetwork ?: return false
         val caps = cm.getNetworkCapabilities(network) ?: return false
         return caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
             caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+    }
+
+    suspend fun publishLocalFile(
+        sourceFile: File,
+        fileName: String,
+        mediaType: MediaType,
+        options: SaveOptions = SaveOptions()
+    ): Result<SavedFileMeta> = withContext(Dispatchers.IO) {
+        val album = options.albumName.ifBlank { "Stow" }
+        val (collection, relativePath, mimeType) = when (mediaType) {
+            MediaType.VIDEO -> Triple(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, "Movies/$album", "video/mp4")
+            MediaType.AUDIO -> Triple(
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                "Music/$album",
+                if (fileName.endsWith(".mp3", ignoreCase = true)) "audio/mpeg" else "audio/mp4"
+            )
+            MediaType.IMAGE -> Triple(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "Pictures/$album", "image/jpeg")
+        }
+
+        val values = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+            put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+            put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
+        }
+
+        val resolver = context.contentResolver
+        val pendingUri = resolver.insert(collection, values)
+            ?: return@withContext Result.failure(IllegalStateException("Failed to create MediaStore entry"))
+
+        try {
+            FileInputStream(sourceFile).use { input ->
+                resolver.openOutputStream(pendingUri)?.use { output ->
+                    input.copyTo(output)
+                } ?: throw IllegalStateException("Failed to open output stream")
+            }
+            resolver.update(
+                pendingUri,
+                ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) },
+                null,
+                null
+            )
+            Result.success(SavedFileMeta(pendingUri.toString(), fileName, sourceFile.length()))
+        } catch (e: Throwable) {
+            try { resolver.delete(pendingUri, null, null) } catch (_: Exception) {}
+            if (e is CancellationException) throw e
+            Result.failure(e)
+        }
     }
 
     suspend fun downloadToGallery(

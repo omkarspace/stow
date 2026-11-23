@@ -3,6 +3,7 @@ package com.cleansaver.app.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.cleansaver.app.data.engine.YtDlpEngine
 import com.cleansaver.app.di.AppContainer
 import com.cleansaver.app.domain.repository.LibraryRepository
 import com.cleansaver.app.domain.repository.RemoteConfigRepository
@@ -23,6 +24,7 @@ class SettingsViewModel(
     private val remoteConfigRepository: RemoteConfigRepository,
     private val libraryRepository: LibraryRepository,
     private val appUpdateChecker: AppUpdateChecker,
+    private val ytDlpEngine: YtDlpEngine,
     private val appVersionName: String
 ) : ViewModel() {
 
@@ -32,6 +34,9 @@ class SettingsViewModel(
     private val _isCheckingUpdate = MutableStateFlow(false)
     private val _updateInfo = MutableStateFlow<ReleaseUpdateInfo?>(null)
     private val _updateMessage = MutableStateFlow<String?>(null)
+    private val _isUpdatingYtDlp = MutableStateFlow(false)
+    private val _ytDlpMessage = MutableStateFlow<String?>(null)
+    private val _ytDlpSuccess = MutableStateFlow(true)
     private val _logs = MutableStateFlow<List<String>>(emptyList())
 
     private data class CorePrefs(
@@ -55,6 +60,13 @@ class SettingsViewModel(
         val isCheckingUpdate: Boolean,
         val updateInfo: ReleaseUpdateInfo?,
         val updateMsg: String?
+    )
+
+    private data class EngineState(
+        val isUpdatingYtDlp: Boolean,
+        val ytDlpMsg: String?,
+        val ytDlpSuccess: Boolean,
+        val logs: List<String>
     )
 
     private val corePrefsFlow = combine(
@@ -86,12 +98,21 @@ class SettingsViewModel(
         ActionState(refreshing, msg, checkingUpd, updInfo, updMsg)
     }
 
+    private val engineStateFlow = combine(
+        _isUpdatingYtDlp,
+        _ytDlpMessage,
+        _ytDlpSuccess,
+        _logs
+    ) { updating, msg, ok, logs ->
+        EngineState(updating, msg, ok, logs)
+    }
+
     val uiState: StateFlow<SettingsUiState> = combine(
         corePrefsFlow,
         advancedPrefsFlow,
         actionStateFlow,
-        _logs
-    ) { core, adv, act, logs ->
+        engineStateFlow
+    ) { core, adv, act, eng ->
         SettingsUiState(
             themeMode = core.theme,
             clipboardAutoDetect = core.clipboard,
@@ -109,7 +130,10 @@ class SettingsViewModel(
             isCheckingUpdate = act.isCheckingUpdate,
             updateInfo = act.updateInfo,
             updateCheckMessage = act.updateMsg,
-            diagnosticLogs = logs,
+            isUpdatingYtDlp = eng.isUpdatingYtDlp,
+            ytDlpUpdateMessage = eng.ytDlpMsg,
+            ytDlpUpdateSuccess = eng.ytDlpSuccess,
+            diagnosticLogs = eng.logs,
             appVersion = appVersionName
         )
     }.stateIn(
@@ -152,6 +176,19 @@ class SettingsViewModel(
 
     fun setCustomAlbumName(album: String) {
         viewModelScope.launch { userPrefsRepository.setCustomAlbumName(album) }
+    }
+
+    fun updateYtDlpEngine() {
+        viewModelScope.launch {
+            _isUpdatingYtDlp.value = true
+            _ytDlpMessage.value = null
+            val result = ytDlpEngine.updateEngine()
+            _isUpdatingYtDlp.value = false
+            _ytDlpSuccess.value = result.isSuccess
+            _ytDlpMessage.value = result.getOrElse {
+                "Update failed: ${it.message ?: "check connection"}"
+            }
+        }
     }
 
     fun refreshParserConfig() {
@@ -212,6 +249,7 @@ class SettingsViewModel(
                         remoteConfigRepository = container.remoteConfigRepository,
                         libraryRepository = container.libraryRepository,
                         appUpdateChecker = container.appUpdateChecker,
+                        ytDlpEngine = container.ytDlpEngine,
                         appVersionName = container.appVersionName
                     ) as T
                 }

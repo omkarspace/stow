@@ -55,6 +55,12 @@ android {
         }
     }
 
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -104,6 +110,9 @@ dependencies {
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
+    implementation(libs.youtubedl.library)
+    implementation(libs.youtubedl.ffmpeg)
+    implementation(libs.youtubedl.aria2c)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 

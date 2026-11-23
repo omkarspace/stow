@@ -51,7 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.cleansaver.app.ui.components.StowDarkBlock
-import com.cleansaver.app.ui.components.StowTopBarBlock
+import com.cleansaver.app.ui.components.StowLavenderBadge
 import com.cleansaver.app.ui.library.LibraryViewModel
 import com.cleansaver.app.ui.theme.ErrorRedDark
 import com.cleansaver.app.ui.theme.StowInkMutedOnDark
@@ -89,17 +89,31 @@ fun SettingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 14.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+            .padding(horizontal = 16.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        StowTopBarBlock(badgeText = "V${state.appVersion}")
+        // Lightweight Canvas-Direct Swiss Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 2.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "SETTINGS",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            StowLavenderBadge(text = "V${state.appVersion}")
+        }
 
         // Block 1: Appearance & Automation
         StowDarkBlock {
             Text("Appearance", style = MaterialTheme.typography.titleLarge, color = StowInkOnDark)
             Spacer(modifier = Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("SYSTEM" to "BRIK", "LIGHT" to "BONE", "DARK" to "NIGHT").forEach { (mode, label) ->
+                listOf("SYSTEM" to "SWISS", "LIGHT" to "LIGHT", "DARK" to "DARK").forEach { (mode, label) ->
                     FilterChip(
                         selected = state.themeMode == mode,
                         onClick = { viewModel.setThemeMode(mode) },
@@ -119,7 +133,7 @@ fun SettingsScreen(
 
             SettingsToggleRow(
                 title = "Clipboard auto-detect",
-                subtitle = "Extract supported links automatically on focus",
+                subtitle = "Fetch copied links automatically on focus",
                 checked = state.clipboardAutoDetect,
                 onCheckedChange = { viewModel.setClipboardAutoDetect(it) }
             )
@@ -128,7 +142,7 @@ fun SettingsScreen(
 
             SettingsToggleRow(
                 title = "Instant 1-tap Share save",
-                subtitle = "Skip preview and download immediately on share",
+                subtitle = "Skip format picker and download best quality on share",
                 checked = state.instantShareSave,
                 onCheckedChange = { viewModel.setInstantShareSave(it) }
             )
@@ -148,7 +162,7 @@ fun SettingsScreen(
             Text("Downloads & storage", style = MaterialTheme.typography.titleLarge, color = StowInkOnDark)
             Spacer(modifier = Modifier.height(12.dp))
 
-            Text("Stream quality", style = MaterialTheme.typography.bodySmall, color = StowInkMutedOnDark)
+            Text("Default quality", style = MaterialTheme.typography.bodySmall, color = StowInkMutedOnDark)
             Spacer(modifier = Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("BEST" to "BEST QUALITY", "DATA_SAVER" to "DATA SAVER").forEach { (q, label) ->
@@ -168,7 +182,7 @@ fun SettingsScreen(
             Text("File naming", style = MaterialTheme.typography.bodySmall, color = StowInkMutedOnDark)
             Spacer(modifier = Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("DEFAULT" to "STOW_CODE", "CREATOR_DATE" to "CREATOR_DATE").forEach { (p, label) ->
+                listOf("DEFAULT" to "STOW_TITLE", "CREATOR_DATE" to "CREATOR_TITLE").forEach { (p, label) ->
                     FilterChip(
                         selected = state.fileNamingPattern == p,
                         onClick = { viewModel.setFileNamingPattern(p) },
@@ -228,7 +242,7 @@ fun SettingsScreen(
             HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = StowPineMuted)
 
             Text(
-                text = "Stow runs 100% on-device with zero ads, zero logins, and zero analytics. Unaffiliated with Meta, X, Reddit, Pinterest, TikTok, or YouTube.",
+                text = "Stow runs 100% on-device using yt-dlp + FFmpeg with zero ads, zero logins, and zero analytics.",
                 style = MaterialTheme.typography.bodySmall,
                 color = StowInkMutedOnDark
             )
@@ -238,6 +252,39 @@ fun SettingsScreen(
         StowDarkBlock {
             Text("Engine & maintenance", style = MaterialTheme.typography.titleLarge, color = StowInkOnDark)
             Spacer(modifier = Modifier.height(12.dp))
+
+            // Primary 1-Tap yt-dlp Engine Update Button
+            Button(
+                onClick = { viewModel.updateYtDlpEngine() },
+                enabled = !state.isUpdatingYtDlp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = StowLavender, contentColor = StowPineDark),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+            ) {
+                if (state.isUpdatingYtDlp) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = StowPineDark)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("UPDATING YT-DLP...", style = MaterialTheme.typography.labelLarge)
+                } else {
+                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("UPDATE YT-DLP ENGINE", style = MaterialTheme.typography.labelLarge)
+                }
+            }
+
+            state.ytDlpUpdateMessage?.let { msg ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = msg,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (state.ytDlpUpdateSuccess) SuccessGreenDark else ErrorRedDark
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -272,7 +319,7 @@ fun SettingsScreen(
                         Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = StowLavender, modifier = Modifier.size(15.dp))
                     }
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("UPDATES", style = MaterialTheme.typography.labelSmall, color = StowInkOnDark)
+                    Text("APP UPDATE", style = MaterialTheme.typography.labelSmall, color = StowInkOnDark)
                 }
             }
 
@@ -319,7 +366,7 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Extraction log", style = MaterialTheme.typography.titleMedium, color = StowInkOnDark)
-                    Text("Recent strategy attempts & HTTP codes", style = MaterialTheme.typography.bodySmall, color = StowInkMutedOnDark)
+                    Text("Recent yt-dlp & fallback logs", style = MaterialTheme.typography.bodySmall, color = StowInkMutedOnDark)
                 }
                 TextButton(onClick = {
                     viewModel.refreshDiagnosticLogs()

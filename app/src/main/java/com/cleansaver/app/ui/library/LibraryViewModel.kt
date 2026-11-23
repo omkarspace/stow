@@ -66,6 +66,7 @@ class LibraryViewModel(
             }
             val matchesTag = params.tag == null || item.tag.equals(params.tag, ignoreCase = true)
             val matchesQuery = trimmedQuery.isEmpty() ||
+                item.title.lowercase().contains(trimmedQuery) ||
                 item.fileName.lowercase().contains(trimmedQuery) ||
                 item.shortcode.lowercase().contains(trimmedQuery) ||
                 item.caption.lowercase().contains(trimmedQuery) ||

@@ -36,10 +36,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cleansaver.app.CleanSaverApplication
 import com.cleansaver.app.domain.model.DownloadProgress
 import com.cleansaver.app.domain.model.MediaType
+import com.cleansaver.app.ui.components.FormatPickerBottomSheet
 import com.cleansaver.app.ui.components.StowLavenderBadge
 import com.cleansaver.app.ui.components.StowSegmentedProgressBar
 import com.cleansaver.app.ui.home.formatAppError
@@ -93,10 +95,22 @@ fun ShareReceiverSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     LaunchedEffect(state) {
-        if (state is ShareSheetUiState.Completed) {
+        if (state is ShareSheetUiState.Completed || state is ShareSheetUiState.Enqueued) {
             delay(1100)
             onDismiss()
         }
+    }
+
+    if (state is ShareSheetUiState.FormatPickerReady) {
+        val info = (state as ShareSheetUiState.FormatPickerReady).mediaInfo
+        FormatPickerBottomSheet(
+            mediaInfo = info,
+            onDownload = { format, subs, thumb ->
+                viewModel.enqueueFormat(info, format, subs, thumb)
+            },
+            onDismiss = onDismiss
+        )
+        return
     }
 
     ModalBottomSheet(
@@ -138,7 +152,30 @@ fun ShareReceiverSheet(
                                 strokeWidth = 2.dp
                             )
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text("Resolving media...", style = MaterialTheme.typography.bodyMedium, color = StowInkOnDark)
+                            Text("Fetching formats via yt-dlp...", style = MaterialTheme.typography.bodyMedium, color = StowInkOnDark)
+                        }
+                    }
+                }
+
+                is ShareSheetUiState.Enqueued -> {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = StowPineElevated
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SuccessGreenDark, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Downloading: ${s.title}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = SuccessGreenDark,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                     }
                 }
@@ -245,6 +282,8 @@ fun ShareReceiverSheet(
                         }
                     }
                 }
+
+                is ShareSheetUiState.FormatPickerReady -> {}
             }
 
             Spacer(modifier = Modifier.height(24.dp))

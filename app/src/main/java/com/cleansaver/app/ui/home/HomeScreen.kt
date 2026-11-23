@@ -17,7 +17,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -27,8 +26,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -40,7 +37,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentPaste
@@ -66,6 +62,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -84,12 +81,12 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.cleansaver.app.data.local.DownloadedMediaEntity
+import com.cleansaver.app.data.engine.QueueTaskStatus
 import com.cleansaver.app.domain.model.AppError
 import com.cleansaver.app.domain.model.DownloadProgress
 import com.cleansaver.app.domain.model.MediaCandidate
 import com.cleansaver.app.domain.model.MediaType
-import com.cleansaver.app.domain.usecase.ValidateUrlUseCase
+import com.cleansaver.app.ui.components.FormatPickerBottomSheet
 import com.cleansaver.app.ui.components.MediaPreviewDialog
 import com.cleansaver.app.ui.components.StowActionButton
 import com.cleansaver.app.ui.components.StowDarkBadge
@@ -97,9 +94,6 @@ import com.cleansaver.app.ui.components.StowDarkBlock
 import com.cleansaver.app.ui.components.StowExtractionShimmerBlock
 import com.cleansaver.app.ui.components.StowLavenderBadge
 import com.cleansaver.app.ui.components.StowSegmentedProgressBar
-import com.cleansaver.app.ui.components.StowStatTile
-import com.cleansaver.app.ui.components.StowTopBarBlock
-import com.cleansaver.app.ui.library.LibraryViewModel
 import com.cleansaver.app.ui.theme.ErrorRedDark
 import com.cleansaver.app.ui.theme.StowInkMutedOnDark
 import com.cleansaver.app.ui.theme.StowInkOnDark
@@ -113,26 +107,33 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
-    libraryViewModel: LibraryViewModel,
     snackbarHostState: SnackbarHostState,
     clipboardSuggestion: String? = null,
     onUseClipboardSuggestion: (String) -> Unit = {},
-    onDismissClipboardSuggestion: () -> Unit = {}
+    onDismissClipboardSuggestion: () -> Unit = {},
+    onOpenQueue: () -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
-    val libraryState by libraryViewModel.uiState.collectAsState()
+    val queueTasks by viewModel.queueTasks.collectAsState()
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
     val keyboard = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
-    val validator = remember { ValidateUrlUseCase() }
 
-    val detectedParsedUrl = remember(state.inputUrl) {
-        if (state.inputUrl.isBlank()) null else validator(state.inputUrl).getOrNull()
+    val activeTask = remember(queueTasks) {
+        queueTasks.firstOrNull {
+            it.status == QueueTaskStatus.DOWNLOADING || it.status == QueueTaskStatus.QUEUED
+        }
     }
 
     var previewCandidate by remember { mutableStateOf<MediaCandidate?>(null) }
-    var previewRecentItem by remember { mutableStateOf<DownloadedMediaEntity?>(null) }
+
+    LaunchedEffect(state.actionBannerMessage) {
+        state.actionBannerMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            viewModel.clearBanner()
+        }
+    }
 
     fun copyWithSnackbar(label: String, text: String) {
         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -145,13 +146,24 @@ fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 14.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+            .padding(horizontal = 16.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // 1. Top Wordmark Block
-        StowTopBarBlock(
-            badgeText = if (libraryState.totalCount > 0) "${libraryState.totalCount} STOWED" else "ON-DEVICE"
-        )
+        // 1. Lightweight Canvas-Direct Swiss Top Header (Concept A)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 2.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "STOW®",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            StowLavenderBadge(text = "YT-DLP · 1000+")
+        }
 
         // 2. Smart Clipboard Detection Pill
         AnimatedVisibility(
@@ -167,7 +179,7 @@ fun HomeScreen(
                             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onUseClipboardSuggestion(clipUrl)
                         },
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(18.dp),
                     color = StowLavender
                 ) {
                     Row(
@@ -183,7 +195,7 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "LINK IN CLIPBOARD · TAP TO STOW",
+                                text = "LINK IN CLIPBOARD · TAP TO FETCH",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = StowPineDark
                             )
@@ -203,28 +215,28 @@ fun HomeScreen(
             }
         }
 
-        // 3. Hero Input Modular Dark Block
+        // 3. Single Hero Dark Modular Block (Concept A)
         StowDarkBlock {
             Text(
-                text = "Stow any\npublic media.",
+                text = "Save anything,\nanywhere.",
                 style = MaterialTheme.typography.headlineLarge,
                 color = StowInkOnDark
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "Instagram · Threads · X · Reddit · Pinterest · TikTok · Shorts",
+                text = "YouTube · Instagram · TikTok · X · Reddit · 1,000+ sites",
                 style = MaterialTheme.typography.bodySmall,
                 color = StowInkMutedOnDark
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
             OutlinedTextField(
                 value = state.inputUrl,
                 onValueChange = { viewModel.onUrlChanged(it) },
                 placeholder = {
                     Text(
-                        text = "Paste link(s), one per line...",
+                        text = "Paste any video or audio URL...",
                         style = MaterialTheme.typography.bodyMedium,
                         color = StowInkMutedOnDark
                     )
@@ -235,17 +247,29 @@ fun HomeScreen(
                             Icon(Icons.Default.Clear, contentDescription = "Clear", tint = StowInkMutedOnDark, modifier = Modifier.size(18.dp))
                         }
                     } else {
-                        IconButton(onClick = {
-                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                            if (clipboard?.hasPrimaryClip() == true &&
-                                clipboard.primaryClipDescription?.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) == true
-                            ) {
-                                val text = clipboard.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
-                                viewModel.onPaste(text)
-                            }
-                        }) {
-                            Icon(Icons.Default.ContentPaste, contentDescription = "Paste", tint = StowLavender, modifier = Modifier.size(18.dp))
+                        Surface(
+                            modifier = Modifier
+                                .padding(end = 6.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                    if (clipboard?.hasPrimaryClip() == true &&
+                                        clipboard.primaryClipDescription?.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) == true
+                                    ) {
+                                        val text = clipboard.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
+                                        viewModel.onPaste(text)
+                                    }
+                                },
+                            shape = RoundedCornerShape(10.dp),
+                            color = StowLavender
+                        ) {
+                            Text(
+                                text = "PASTE",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = StowPineDark,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
                         }
                     }
                 },
@@ -257,7 +281,7 @@ fun HomeScreen(
                     }
                 ),
                 minLines = 1,
-                maxLines = 4,
+                maxLines = 3,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -270,50 +294,22 @@ fun HomeScreen(
                     unfocusedContainerColor = StowPineElevated
                 )
             )
-
-            // Live Platform Detection + Auto-Link Sanitizer ("Clean & Copy")
-            AnimatedVisibility(visible = detectedParsedUrl != null) {
-                detectedParsedUrl?.let { parsed ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        StowLavenderBadge(text = "${parsed.platform.displayName} DETECTED")
-                        TextButton(
-                            onClick = { copyWithSnackbar("Clean link", parsed.canonicalUrl) }
-                        ) {
-                            Icon(Icons.Default.CleaningServices, contentDescription = null, tint = StowLavender, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("CLEAN LINK", style = MaterialTheme.typography.labelSmall, color = StowInkOnDark)
-                        }
-                    }
-                }
-            }
         }
 
-        // 4. Light-Canvas Contrast Action Strip
+        // 4. Light-Canvas Contrast Action Strip (Concept A)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
+                .padding(horizontal = 4.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = if (state.isExtracting || state.isValidating) "Processing" else "Ready to stow",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                StowDarkBadge(text = if (state.isExtracting) "PARSING STREAM" else "ZERO ADS · LOCAL")
-                Spacer(modifier = Modifier.height(6.dp))
+                StowDarkBadge(text = if (state.isExtracting) "FETCHING FORMATS" else "100% ON-DEVICE")
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = state.extractionStatus
-                        ?: if (state.inputUrl.isBlank()) "Paste or share a link" else "Tap extract to preview",
+                        ?: if (state.inputUrl.isBlank()) "Paste or share any link" else "Tap fetch to pick quality",
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onBackground,
                     maxLines = 1,
@@ -324,7 +320,7 @@ fun HomeScreen(
             Spacer(modifier = Modifier.width(12.dp))
 
             StowActionButton(
-                text = if (state.isValidating || state.isExtracting) "Working..." else "Extract",
+                text = if (state.isValidating || state.isExtracting) "Working" else "Fetch",
                 onClick = {
                     keyboard?.hide()
                     viewModel.onExtract()
@@ -333,18 +329,14 @@ fun HomeScreen(
             )
         }
 
-        // Shimmer Skeleton while Extracting
+        // Shimmer Skeleton while Fetching
         AnimatedVisibility(
             visible = state.isValidating || state.isExtracting,
             enter = fadeIn() + expandVertically(),
             exit = fadeOut() + shrinkVertically()
         ) {
             StowExtractionShimmerBlock(
-                stageLabel = when {
-                    state.isValidating -> "RESOLVING LINK"
-                    state.extractionStatus != null -> state.extractionStatus!!.uppercase()
-                    else -> "FETCHING STREAM"
-                }
+                stageLabel = state.extractionStatus?.uppercase() ?: "FETCHING FORMATS"
             )
         }
 
@@ -359,7 +351,7 @@ fun HomeScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = ErrorRedDark, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text("Unable to extract", style = MaterialTheme.typography.titleMedium, color = StowInkOnDark)
+                        Text("Unable to fetch media", style = MaterialTheme.typography.titleMedium, color = StowInkOnDark)
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(formatAppError(err), style = MaterialTheme.typography.bodySmall, color = StowInkMutedOnDark)
@@ -376,7 +368,50 @@ fun HomeScreen(
             }
         }
 
-        // 5. Swipeable Carousel (HorizontalPager) for Extracted Media
+        // 5. Single Live Active Download Card (only when a download is running)
+        AnimatedVisibility(
+            visible = activeTask != null,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            activeTask?.let { task ->
+                StowDarkBlock {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = task.mediaInfo.title,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = StowInkOnDark,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            val subtitle = listOfNotNull(
+                                task.format.label,
+                                task.speed.takeIf { it.isNotBlank() }
+                            ).joinToString(" · ")
+                            Text(
+                                text = subtitle,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = StowInkMutedOnDark,
+                                maxLines = 1
+                            )
+                        }
+                        TextButton(onClick = onOpenQueue) {
+                            Text("QUEUE", color = StowLavender, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    StowSegmentedProgressBar(percent = task.percent)
+                }
+            }
+        }
+
+        // 6. Legacy Photo / Carousel Fallback Preview (only when yt-dlp falls back for IG photos)
         AnimatedVisibility(
             visible = state.extractedCandidates.isNotEmpty(),
             enter = fadeIn() + expandVertically(),
@@ -389,7 +424,7 @@ fun HomeScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 8.dp),
+                            .padding(horizontal = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -433,10 +468,7 @@ fun HomeScreen(
                             if (state.extractedCandidates.size > 1) {
                                 Checkbox(
                                     checked = isSelected,
-                                    onCheckedChange = {
-                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        viewModel.toggleCandidateSelection(pageIndex)
-                                    },
+                                    onCheckedChange = { viewModel.toggleCandidateSelection(pageIndex) },
                                     colors = CheckboxDefaults.colors(
                                         checkedColor = StowLavender,
                                         checkmarkColor = StowPineDark,
@@ -444,13 +476,10 @@ fun HomeScreen(
                                     )
                                 )
                             }
-
                             StowLavenderBadge(
                                 text = "${candidate.platform.displayName} · ${if (candidate.mediaType == MediaType.VIDEO) "VIDEO" else "PHOTO"}"
                             )
-
                             Spacer(modifier = Modifier.width(10.dp))
-
                             Text(
                                 text = candidate.creatorHandle?.let { "@$it" } ?: candidate.shortcode,
                                 style = MaterialTheme.typography.bodySmall,
@@ -459,10 +488,6 @@ fun HomeScreen(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f)
                             )
-
-                            TextButton(onClick = { previewCandidate = candidate }) {
-                                Text("PREVIEW", style = MaterialTheme.typography.labelSmall, color = StowInkOnDark)
-                            }
                         }
 
                         val previewImageUrl = candidate.thumbnailUrl
@@ -474,7 +499,7 @@ fun HomeScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .aspectRatio(16f / 9f)
-                                    .clip(RoundedCornerShape(18.dp))
+                                    .clip(RoundedCornerShape(16.dp))
                                     .background(StowPineElevated)
                                     .clickable { previewCandidate = candidate }
                             ) {
@@ -489,34 +514,19 @@ fun HomeScreen(
                                         shape = CircleShape,
                                         color = StowPineDark.copy(alpha = 0.8f),
                                         modifier = Modifier
-                                            .size(46.dp)
+                                            .size(44.dp)
                                             .align(Alignment.Center)
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.PlayArrow,
-                                            contentDescription = "Play Preview",
-                                            tint = StowLavender,
-                                            modifier = Modifier.padding(10.dp)
-                                        )
+                                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = StowLavender, modifier = Modifier.padding(10.dp))
                                     }
                                 }
                             }
                         }
 
                         candidate.caption?.takeIf { it.isNotBlank() }?.let { caption ->
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = caption,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = StowInkMutedOnDark,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                            Spacer(modifier = Modifier.height(10.dp))
                             val hashtags = remember(caption) { candidate.extractHashtags() }
-                            Row(
-                                modifier = Modifier.padding(top = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 TextButton(onClick = { copyWithSnackbar("Caption", caption) }) {
                                     Icon(Icons.Default.ContentCopy, contentDescription = null, tint = StowLavender, modifier = Modifier.size(14.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
@@ -533,14 +543,9 @@ fun HomeScreen(
                         }
 
                         if (candidate.mediaType == MediaType.VIDEO) {
-                            Spacer(modifier = Modifier.height(8.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 OutlinedButton(
-                                    onClick = {
-                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        viewModel.onDownloadAudio(candidate)
-                                        scope.launch { snackbarHostState.showSnackbar("Extracting audio (.m4a)...") }
-                                    },
+                                    onClick = { viewModel.onDownloadAudio(candidate) },
                                     enabled = !state.isDownloading,
                                     shape = RoundedCornerShape(12.dp),
                                     border = BorderStroke(1.dp, StowPineMuted)
@@ -551,11 +556,7 @@ fun HomeScreen(
                                 }
                                 if (!candidate.thumbnailUrl.isNullOrBlank()) {
                                     OutlinedButton(
-                                        onClick = {
-                                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            viewModel.onDownloadCover(candidate)
-                                            scope.launch { snackbarHostState.showSnackbar("Saving cover image...") }
-                                        },
+                                        onClick = { viewModel.onDownloadCover(candidate) },
                                         enabled = !state.isDownloading,
                                         shape = RoundedCornerShape(12.dp),
                                         border = BorderStroke(1.dp, StowPineMuted)
@@ -569,25 +570,9 @@ fun HomeScreen(
                         }
 
                         if (progress != null) {
-                            Spacer(modifier = Modifier.height(14.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
                             when (progress) {
-                                is DownloadProgress.Queued -> {
-                                    Text("Queued...", style = MaterialTheme.typography.bodySmall, color = StowInkMutedOnDark)
-                                }
-                                is DownloadProgress.Running -> {
-                                    Text("Download progress", style = MaterialTheme.typography.titleMedium, color = StowInkOnDark)
-                                    Text(
-                                        text = if (progress.totalBytes > 0) {
-                                            "${formatBytes(progress.bytesRead)} of ${formatBytes(progress.totalBytes)}"
-                                        } else {
-                                            formatBytes(progress.bytesRead)
-                                        },
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = StowInkMutedOnDark
-                                    )
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    StowSegmentedProgressBar(percent = progress.percent)
-                                }
+                                is DownloadProgress.Running -> StowSegmentedProgressBar(percent = progress.percent)
                                 is DownloadProgress.Completed -> {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
@@ -597,29 +582,20 @@ fun HomeScreen(
                                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                                             Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SuccessGreenDark, modifier = Modifier.size(18.dp))
                                             Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = "Stowed · ${progress.fileName}",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = SuccessGreenDark,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
+                                            Text("Saved · ${progress.fileName}", style = MaterialTheme.typography.bodySmall, color = SuccessGreenDark, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         }
                                         Row {
                                             IconButton(
                                                 onClick = {
                                                     try {
                                                         val viewIntent = Intent(Intent.ACTION_VIEW).apply {
-                                                            setDataAndType(
-                                                                Uri.parse(progress.mediaStoreUri),
-                                                                if (candidate.mediaType == MediaType.VIDEO) "video/*" else "image/*"
-                                                            )
+                                                            setDataAndType(Uri.parse(progress.mediaStoreUri), if (candidate.mediaType == MediaType.VIDEO) "video/*" else "image/*")
                                                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                                         }
                                                         context.startActivity(viewIntent)
                                                     } catch (_: Exception) {}
                                                 },
-                                                modifier = Modifier.size(32.dp)
+                                                modifier = Modifier.size(30.dp)
                                             ) {
                                                 Icon(Icons.Default.OpenInNew, contentDescription = "Open", tint = StowInkOnDark, modifier = Modifier.size(16.dp))
                                             }
@@ -634,158 +610,51 @@ fun HomeScreen(
                                                         context.startActivity(Intent.createChooser(shareIntent, "Share Media"))
                                                     } catch (_: Exception) {}
                                                 },
-                                                modifier = Modifier.size(32.dp)
+                                                modifier = Modifier.size(30.dp)
                                             ) {
                                                 Icon(Icons.Default.Share, contentDescription = "Share", tint = StowInkOnDark, modifier = Modifier.size(16.dp))
                                             }
                                         }
                                     }
                                 }
-                                is DownloadProgress.Failed -> {
-                                    Text(formatAppError(progress.error), style = MaterialTheme.typography.bodySmall, color = ErrorRedDark)
-                                }
+                                is DownloadProgress.Failed -> Text(formatAppError(progress.error), style = MaterialTheme.typography.bodySmall, color = ErrorRedDark)
                                 else -> {}
                             }
                         }
                     }
                 }
 
-                // Lavender Pager Dot Indicators
-                if (state.extractedCandidates.size > 1) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        repeat(state.extractedCandidates.size) { idx ->
-                            val active = pagerState.currentPage == idx
-                            Box(
-                                modifier = Modifier
-                                    .padding(horizontal = 3.dp)
-                                    .height(6.dp)
-                                    .width(if (active) 20.dp else 6.dp)
-                                    .clip(CircleShape)
-                                    .background(if (active) StowPineDark else StowPineMuted.copy(alpha = 0.35f))
-                            )
-                        }
-                    }
-                }
-
-                // Light-canvas Save CTA Strip
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column {
-                        Text(
-                            text = "Save to gallery",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-                        )
-                        Text(
-                            text = "${state.selectedIndices.size} item${if (state.selectedIndices.size > 1) "s" else ""} ready",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
+                    Text(
+                        text = "${state.selectedIndices.size} item${if (state.selectedIndices.size > 1) "s" else ""} ready",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
                     StowActionButton(
-                        text = if (state.isDownloading) "Saving..." else "Save",
+                        text = if (state.isDownloading) "Saving" else "Save",
                         onClick = { viewModel.onDownload(force = false) },
                         enabled = state.selectedIndices.isNotEmpty() && !state.isDownloading
                     )
                 }
             }
         }
+    }
 
-        // 6. Recent Stows Horizontal Strip (keeps Home alive & 1-tap accessible)
-        if (state.extractedCandidates.isEmpty() && libraryState.items.isNotEmpty()) {
-            val recents = libraryState.items.take(6)
-            StowDarkBlock {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Recent stows", style = MaterialTheme.typography.titleMedium, color = StowInkOnDark)
-                    StowLavenderBadge(text = "${recents.size} LATEST")
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(end = 4.dp)
-                ) {
-                    items(recents, key = { it.id }) { item ->
-                        Box(
-                            modifier = Modifier
-                                .size(76.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(StowPineElevated)
-                                .clickable { previewRecentItem = item }
-                        ) {
-                            if (item.mediaType == "AUDIO") {
-                                Icon(
-                                    imageVector = Icons.Default.AudioFile,
-                                    contentDescription = item.fileName,
-                                    tint = StowLavender,
-                                    modifier = Modifier
-                                        .size(28.dp)
-                                        .align(Alignment.Center)
-                                )
-                            } else {
-                                AsyncImage(
-                                    model = Uri.parse(item.mediaStoreUri),
-                                    contentDescription = item.fileName,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
-                                if (item.mediaType == "VIDEO") {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = StowPineDark.copy(alpha = 0.7f),
-                                        modifier = Modifier
-                                            .size(24.dp)
-                                            .align(Alignment.Center)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.PlayArrow,
-                                            contentDescription = null,
-                                            tint = StowLavender,
-                                            modifier = Modifier.padding(4.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // 7. Bottom Paired Dark Bento Stat Tiles
-        if (state.extractedCandidates.isEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                StowStatTile(
-                    title = "Saved media",
-                    subtitle = "On-device library",
-                    value = "${libraryState.totalCount}",
-                    modifier = Modifier.weight(1f)
-                )
-                StowStatTile(
-                    title = "Storage used",
-                    subtitle = "Local gallery",
-                    value = formatBytes(libraryState.totalSizeBytes),
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
+    // Seal-style Stow Swiss Format Picker Bottom Sheet
+    state.pendingMediaInfo?.let { info ->
+        FormatPickerBottomSheet(
+            mediaInfo = info,
+            onDownload = { format, subs, thumb ->
+                viewModel.enqueueDownload(info, format, subs, thumb)
+            },
+            onDismiss = { viewModel.dismissFormatSheet() }
+        )
     }
 
     previewCandidate?.let { candidate ->
@@ -794,15 +663,6 @@ fun HomeScreen(
             isVideo = candidate.mediaType == MediaType.VIDEO,
             title = if (candidate.mediaType == MediaType.VIDEO) "Video Preview" else "Photo Preview",
             onDismiss = { previewCandidate = null }
-        )
-    }
-
-    previewRecentItem?.let { item ->
-        MediaPreviewDialog(
-            mediaUriOrUrl = item.mediaStoreUri,
-            isVideo = item.mediaType == "VIDEO",
-            title = item.fileName,
-            onDismiss = { previewRecentItem = null }
         )
     }
 
@@ -839,12 +699,12 @@ fun HomeScreen(
 }
 
 internal fun formatAppError(err: AppError): String = when (err) {
-    is AppError.InvalidUrl -> "Enter a valid public Instagram, Threads, X, Reddit, Pinterest, TikTok, or YouTube Shorts link."
+    is AppError.InvalidUrl -> "Enter a valid http:// or https:// media link from any supported site."
     is AppError.StoriesNotSupported -> "Instagram Stories are private/ephemeral and not supported."
     is AppError.PrivateAccountNotSupported -> "Media from private accounts cannot be accessed."
     is AppError.PostNotFound -> "Post was not found or has been removed."
     is AppError.NetworkRateLimited -> "Rate-limited by platform. Try again in a moment."
-    is AppError.ParserOutdated -> "Could not parse this post. Try syncing parser rules in Settings."
+    is AppError.ParserOutdated -> "Could not parse this link. Try updating yt-dlp in Settings."
     is AppError.NoInternet -> "No internet connection. Check your network and try again."
     is AppError.WifiOnlyBlocked -> "Wi-Fi Only mode is enabled. Connect to Wi-Fi or turn it off in Settings."
     is AppError.StorageError -> "Storage error: ${err.reason}"

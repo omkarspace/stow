@@ -42,9 +42,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Queue
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material.icons.outlined.Queue
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -76,12 +78,14 @@ import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import com.cleansaver.app.CleanSaverApplication
+import com.cleansaver.app.data.engine.QueueTaskStatus
 import com.cleansaver.app.ui.components.DisclaimerBottomSheet
 import com.cleansaver.app.ui.components.StowActionButton
 import com.cleansaver.app.ui.components.StowDarkBlock
 import com.cleansaver.app.ui.components.StowFloatingSnackbarHost
 import com.cleansaver.app.ui.library.LibraryScreen
 import com.cleansaver.app.ui.library.LibraryViewModel
+import com.cleansaver.app.ui.queue.QueueScreen
 import com.cleansaver.app.ui.settings.SettingsScreen
 import com.cleansaver.app.ui.settings.SettingsViewModel
 import com.cleansaver.app.ui.theme.CleanSaverTheme
@@ -101,6 +105,7 @@ class MainActivity : FragmentActivity() {
     private var lastAutoPastedClip: String? = null
     private var pendingQuickPaste: Boolean = false
     private val clipboardSuggestionFlow = MutableStateFlow<String?>(null)
+    private val httpUrlRegex = Regex("""https?://[^\s/$.?#].[^\s]*""", RegexOption.IGNORE_CASE)
 
     private val homeViewModel: HomeViewModel by viewModels {
         val app = application as CleanSaverApplication
@@ -127,6 +132,10 @@ class MainActivity : FragmentActivity() {
         setContent {
             val settingsState by settingsViewModel.uiState.collectAsState()
             val clipboardSuggestion by clipboardSuggestionFlow.collectAsState()
+            val queueTasks by homeViewModel.queueTasks.collectAsState()
+            val activeQueueCount = queueTasks.count {
+                it.status == QueueTaskStatus.DOWNLOADING || it.status == QueueTaskStatus.QUEUED
+            }
             val darkTheme = when (settingsState.themeMode) {
                 "LIGHT" -> false
                 "DARK" -> true
@@ -178,6 +187,7 @@ class MainActivity : FragmentActivity() {
                     bottomBar = {
                         StowFloatingBottomBar(
                             selectedTab = selectedTab,
+                            activeQueueCount = activeQueueCount,
                             onSelectTab = { selectedTab = it }
                         )
                     }
@@ -190,14 +200,13 @@ class MainActivity : FragmentActivity() {
                         AnimatedContent(
                             targetState = selectedTab,
                             transitionSpec = {
-                                fadeIn(animationSpec = tween(220)) togetherWith fadeOut(animationSpec = tween(150))
+                                fadeIn(animationSpec = tween(200)) togetherWith fadeOut(animationSpec = tween(140))
                             },
                             label = "tab_transition"
                         ) { tab ->
                             when (tab) {
                                 0 -> HomeScreen(
                                     viewModel = homeViewModel,
-                                    libraryViewModel = libraryViewModel,
                                     snackbarHostState = snackbarHostState,
                                     clipboardSuggestion = clipboardSuggestion,
                                     onUseClipboardSuggestion = { url ->
@@ -208,9 +217,11 @@ class MainActivity : FragmentActivity() {
                                     onDismissClipboardSuggestion = {
                                         lastAutoPastedClip = clipboardSuggestion
                                         clipboardSuggestionFlow.value = null
-                                    }
+                                    },
+                                    onOpenQueue = { selectedTab = 1 }
                                 )
-                                1 -> {
+                                1 -> QueueScreen(homeViewModel = homeViewModel)
+                                2 -> {
                                     if (settingsState.vaultLockEnabled && !vaultUnlocked) {
                                         VaultLockedView(
                                             onUnlockClick = {
@@ -224,7 +235,7 @@ class MainActivity : FragmentActivity() {
                                         )
                                     }
                                 }
-                                2 -> SettingsScreen(
+                                3 -> SettingsScreen(
                                     viewModel = settingsViewModel,
                                     libraryViewModel = libraryViewModel,
                                     snackbarHostState = snackbarHostState
@@ -300,29 +311,16 @@ class MainActivity : FragmentActivity() {
             return
         }
 
-        val text = clipboard.primaryClip?.getItemAt(0)?.text?.toString()?.trim() ?: ""
-        val isSupportedLink = text.contains("instagram.com/", ignoreCase = true) ||
-            text.contains("instagr.am/", ignoreCase = true) ||
-            text.contains("threads.net/", ignoreCase = true) ||
-            text.contains("threads.com/", ignoreCase = true) ||
-            text.contains("x.com/", ignoreCase = true) ||
-            text.contains("twitter.com/", ignoreCase = true) ||
-            text.contains("reddit.com/", ignoreCase = true) ||
-            text.contains("pinterest.", ignoreCase = true) ||
-            text.contains("pin.it/", ignoreCase = true) ||
-            text.contains("tiktok.com/", ignoreCase = true) ||
-            text.contains("youtube.com/shorts/", ignoreCase = true) ||
-            text.contains("youtu.be/", ignoreCase = true)
-
-        if (!isSupportedLink) return
+        val raw = clipboard.primaryClip?.getItemAt(0)?.text?.toString()?.trim() ?: ""
+        val url = httpUrlRegex.find(raw)?.value ?: return
 
         val settings = settingsViewModel.uiState.value
-        if (forceFromTile || (settings.clipboardAutoDetect && text != lastAutoPastedClip)) {
-            lastAutoPastedClip = text
+        if (forceFromTile || (settings.clipboardAutoDetect && url != lastAutoPastedClip)) {
+            lastAutoPastedClip = url
             clipboardSuggestionFlow.value = null
-            homeViewModel.onPaste(text)
-        } else if (text != lastAutoPastedClip) {
-            clipboardSuggestionFlow.value = text
+            homeViewModel.onPaste(url)
+        } else if (url != lastAutoPastedClip) {
+            clipboardSuggestionFlow.value = url
         }
     }
 }
@@ -330,6 +328,7 @@ class MainActivity : FragmentActivity() {
 @Composable
 private fun StowFloatingBottomBar(
     selectedTab: Int,
+    activeQueueCount: Int,
     onSelectTab: (Int) -> Unit
 ) {
     val haptics = LocalHapticFeedback.current
@@ -347,7 +346,7 @@ private fun StowFloatingBottomBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -355,31 +354,45 @@ private fun StowFloatingBottomBar(
                     label = "STOW",
                     icon = if (selectedTab == 0) Icons.Filled.Download else Icons.Outlined.Download,
                     selected = selectedTab == 0,
+                    badgeCount = 0,
                     onClick = {
                         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onSelectTab(0)
                     },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(if (selectedTab == 0) 1.3f else 1f)
                 )
                 StowNavItem(
-                    label = "LIBRARY",
-                    icon = if (selectedTab == 1) Icons.Filled.PhotoLibrary else Icons.Outlined.PhotoLibrary,
+                    label = "QUEUE",
+                    icon = if (selectedTab == 1) Icons.Filled.Queue else Icons.Outlined.Queue,
                     selected = selectedTab == 1,
+                    badgeCount = activeQueueCount,
                     onClick = {
                         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onSelectTab(1)
                     },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(if (selectedTab == 1) 1.3f else 1f)
                 )
                 StowNavItem(
-                    label = "SETTINGS",
-                    icon = if (selectedTab == 2) Icons.Filled.Settings else Icons.Outlined.Settings,
+                    label = "LIBRARY",
+                    icon = if (selectedTab == 2) Icons.Filled.PhotoLibrary else Icons.Outlined.PhotoLibrary,
                     selected = selectedTab == 2,
+                    badgeCount = 0,
                     onClick = {
                         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onSelectTab(2)
                     },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(if (selectedTab == 2) 1.4f else 1f)
+                )
+                StowNavItem(
+                    label = "SETTINGS",
+                    icon = if (selectedTab == 3) Icons.Filled.Settings else Icons.Outlined.Settings,
+                    selected = selectedTab == 3,
+                    badgeCount = 0,
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onSelectTab(3)
+                    },
+                    modifier = Modifier.weight(if (selectedTab == 3) 1.45f else 1f)
                 )
             }
         }
@@ -391,6 +404,7 @@ private fun StowNavItem(
     label: String,
     icon: ImageVector,
     selected: Boolean,
+    badgeCount: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -401,14 +415,14 @@ private fun StowNavItem(
     )
     Surface(
         modifier = modifier
-            .padding(horizontal = 4.dp)
+            .padding(horizontal = 3.dp)
             .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         color = bgColor
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
@@ -419,12 +433,23 @@ private fun StowNavItem(
                 modifier = Modifier.size(18.dp)
             )
             if (selected) {
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(5.dp))
                 Text(
-                    text = label,
+                    text = if (badgeCount > 0) "$label $badgeCount" else label,
                     style = MaterialTheme.typography.labelSmall,
-                    color = StowPineDark
+                    color = StowPineDark,
+                    maxLines = 1
                 )
+            } else if (badgeCount > 0) {
+                Spacer(modifier = Modifier.width(4.dp))
+                Surface(shape = CircleShape, color = StowLavender) {
+                    Text(
+                        text = "$badgeCount",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = StowPineDark,
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                    )
+                }
             }
         }
     }
@@ -435,7 +460,7 @@ private fun VaultLockedView(onUnlockClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 14.dp, vertical = 20.dp),
+            .padding(horizontal = 16.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.Center
     ) {
         StowDarkBlock {

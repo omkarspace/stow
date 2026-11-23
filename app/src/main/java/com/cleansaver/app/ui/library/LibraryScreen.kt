@@ -33,14 +33,11 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Label
-import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -71,7 +68,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
@@ -84,8 +81,7 @@ import coil.compose.AsyncImage
 import com.cleansaver.app.data.local.DownloadedMediaEntity
 import com.cleansaver.app.ui.components.MediaPreviewDialog
 import com.cleansaver.app.ui.components.StowDarkBlock
-import com.cleansaver.app.ui.components.StowStatTile
-import com.cleansaver.app.ui.components.StowTopBarBlock
+import com.cleansaver.app.ui.components.StowLavenderBadge
 import com.cleansaver.app.ui.home.formatBytes
 import com.cleansaver.app.ui.theme.ErrorRedDark
 import com.cleansaver.app.ui.theme.StowInkMutedOnDark
@@ -96,9 +92,6 @@ import com.cleansaver.app.ui.theme.StowPineElevated
 import com.cleansaver.app.ui.theme.StowPineMuted
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -122,7 +115,6 @@ fun LibraryScreen(
         state.items.filterNot { pendingDeleteIds.contains(it.id) }
     }
     val inSelectionMode = state.selectedIds.isNotEmpty()
-    val dateFormat = remember { SimpleDateFormat("MMM d", Locale.getDefault()) }
 
     LaunchedEffect(Unit) {
         viewModel.pruneStaleEntries()
@@ -132,8 +124,9 @@ fun LibraryScreen(
         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
         pendingDeleteIds = pendingDeleteIds + item.id
         scope.launch {
+            val label = item.title.ifBlank { item.fileName }.take(28)
             val result = snackbarHostState.showSnackbar(
-                message = "Removed ${item.fileName}",
+                message = "Removed $label",
                 actionLabel = "Undo",
                 duration = SnackbarDuration.Short
             )
@@ -163,20 +156,21 @@ fun LibraryScreen(
             columns = GridCells.Fixed(2),
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = PaddingValues(top = 14.dp, bottom = 18.dp)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(top = 18.dp, bottom = 24.dp)
         ) {
+            // Lightweight Canvas-Direct Header (or Selection Bar)
             item(span = { GridItemSpan(2) }) {
                 if (inSelectionMode) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(24.dp),
+                        shape = RoundedCornerShape(20.dp),
                         color = StowPineDark
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             IconButton(onClick = { viewModel.clearSelection() }) {
@@ -213,33 +207,32 @@ fun LibraryScreen(
                         }
                     }
                 } else {
-                    StowTopBarBlock(badgeText = "${state.totalCount} ITEMS")
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 2.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "LIBRARY",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        StowLavenderBadge(
+                            text = if (state.totalCount > 0) {
+                                "${state.totalCount} SAVED · ${formatBytes(state.totalSizeBytes)}"
+                            } else {
+                                "0 SAVED"
+                            }
+                        )
+                    }
                 }
             }
 
             if (state.totalCount > 0) {
                 item(span = { GridItemSpan(2) }) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        StowStatTile(
-                            title = "Total stowed",
-                            subtitle = "${state.videoCount} vid · ${state.imageCount} img · ${state.audioCount} aud",
-                            value = "${state.totalCount}",
-                            modifier = Modifier.weight(1f)
-                        )
-                        StowStatTile(
-                            title = "Storage",
-                            subtitle = "Vid ${formatBytes(state.videoSizeBytes)} · Img ${formatBytes(state.imageSizeBytes)}",
-                            value = formatBytes(state.totalSizeBytes),
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-
-                item(span = { GridItemSpan(2) }) {
-                    Column(modifier = Modifier.padding(top = 4.dp)) {
+                    Column {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -250,7 +243,7 @@ fun LibraryScreen(
                                 onValueChange = { viewModel.setSearchQuery(it) },
                                 placeholder = {
                                     Text(
-                                        text = "Search caption, @creator, tag...",
+                                        text = "Search title, @creator, tag...",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
                                     )
@@ -267,12 +260,12 @@ fun LibraryScreen(
                                 },
                                 singleLine = true,
                                 modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(16.dp),
+                                shape = RoundedCornerShape(14.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedTextColor = MaterialTheme.colorScheme.onBackground,
                                     unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
                                     focusedBorderColor = StowPineDark,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f),
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.18f),
                                     focusedContainerColor = Color.Transparent,
                                     unfocusedContainerColor = Color.Transparent
                                 )
@@ -319,11 +312,11 @@ fun LibraryScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             listOf(
-                                "ALL" to "ALL (${state.totalCount})",
-                                "VIDEO" to "VIDEOS (${state.videoCount})",
-                                "IMAGE" to "PHOTOS (${state.imageCount})",
-                                "AUDIO" to "AUDIO (${state.audioCount})",
-                                "FAVORITES" to "FAVS (${state.favoriteCount})"
+                                "ALL" to "ALL",
+                                "VIDEO" to "VIDEO",
+                                "AUDIO" to "AUDIO",
+                                "IMAGE" to "PHOTO",
+                                "FAVORITES" to "FAVS"
                             ).forEach { (type, label) ->
                                 FilterChip(
                                     selected = state.filterType == type,
@@ -337,7 +330,7 @@ fun LibraryScreen(
                                     border = FilterChipDefaults.filterChipBorder(
                                         enabled = true,
                                         selected = state.filterType == type,
-                                        borderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f)
+                                        borderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.18f)
                                     )
                                 )
                             }
@@ -372,15 +365,15 @@ fun LibraryScreen(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 28.dp),
+                                .padding(vertical = 32.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Surface(
                                 shape = CircleShape,
                                 color = StowLavender,
-                                modifier = Modifier.size(56.dp)
+                                modifier = Modifier.size(54.dp)
                             ) {
-                                Icon(Icons.Default.FolderOpen, contentDescription = null, tint = StowPineDark, modifier = Modifier.padding(15.dp))
+                                Icon(Icons.Default.FolderOpen, contentDescription = null, tint = StowPineDark, modifier = Modifier.padding(14.dp))
                             }
                             Spacer(modifier = Modifier.height(14.dp))
                             Text(
@@ -391,7 +384,7 @@ fun LibraryScreen(
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
                                 text = if (state.totalCount == 0) {
-                                    "Paste a link on the Stow tab or share directly from any supported app."
+                                    "Paste a link on the Stow tab or share from any app."
                                 } else {
                                     "Try clearing your search or switching filters."
                                 },
@@ -407,10 +400,13 @@ fun LibraryScreen(
                     val isVideo = item.mediaType == "VIDEO"
                     val isAudio = item.mediaType == "AUDIO"
                     val isSelected = state.selectedIds.contains(item.id)
+                    var menuExpanded by remember(item.id) { mutableStateOf(false) }
 
+                    // Full-Bleed 4:5 Media Tile (Concept A — Zero Clutter)
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .aspectRatio(4f / 5f)
                             .combinedClickable(
                                 onClick = {
                                     if (inSelectionMode) {
@@ -432,132 +428,83 @@ fun LibraryScreen(
                                     viewModel.toggleSelect(item.id)
                                 }
                             ),
-                        shape = RoundedCornerShape(24.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        border = if (isSelected) BorderStroke(2.dp, StowLavender) else null
+                        shape = RoundedCornerShape(18.dp),
+                        color = StowPineElevated,
+                        border = if (isSelected) BorderStroke(2.5.dp, StowLavender) else null
                     ) {
-                        Column {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            if (isAudio) {
+                                Icon(
+                                    imageVector = Icons.Default.AudioFile,
+                                    contentDescription = item.title,
+                                    tint = StowLavender,
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .align(Alignment.Center)
+                                )
+                            } else {
+                                AsyncImage(
+                                    model = Uri.parse(item.mediaStoreUri),
+                                    contentDescription = item.title.ifBlank { item.fileName },
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+
+                            // Bottom dark gradient scrim for crisp legibility
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .aspectRatio(1f)
-                                    .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                                    .background(StowPineElevated)
+                                    .height(104.dp)
+                                    .align(Alignment.BottomCenter)
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(Color.Transparent, StowPineDark.copy(alpha = 0.94f))
+                                        )
+                                    )
+                            )
+
+                            // Top-left: overflow menu (or favorite dot)
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopStart)
+                                    .padding(6.dp)
                             ) {
-                                if (isAudio) {
-                                    Icon(
-                                        imageVector = Icons.Default.AudioFile,
-                                        contentDescription = "Audio",
-                                        tint = StowLavender,
-                                        modifier = Modifier
-                                            .size(42.dp)
-                                            .align(Alignment.Center)
-                                    )
-                                } else {
-                                    AsyncImage(
-                                        model = Uri.parse(item.mediaStoreUri),
-                                        contentDescription = item.fileName,
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                    if (isVideo) {
-                                        Surface(
-                                            shape = CircleShape,
-                                            color = StowPineDark.copy(alpha = 0.75f),
-                                            modifier = Modifier
-                                                .size(34.dp)
-                                                .align(Alignment.Center)
-                                        ) {
-                                            Icon(Icons.Default.PlayArrow, contentDescription = "Video", tint = StowLavender, modifier = Modifier.padding(7.dp))
-                                        }
-                                    }
-                                }
-
-                                if (isSelected) {
-                                    Icon(
-                                        imageVector = Icons.Default.CheckCircle,
-                                        contentDescription = "Selected",
-                                        tint = StowLavender,
-                                        modifier = Modifier
-                                            .align(Alignment.TopEnd)
-                                            .padding(8.dp)
-                                            .size(22.dp)
-                                    )
-                                } else {
-                                    IconButton(
-                                        onClick = {
-                                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            viewModel.toggleFavorite(item)
-                                        },
-                                        modifier = Modifier
-                                            .align(Alignment.TopEnd)
-                                            .padding(6.dp)
-                                            .size(28.dp)
-                                            .background(StowPineDark.copy(alpha = 0.65f), CircleShape)
-                                    ) {
-                                        Icon(
-                                            imageVector = if (item.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                                            contentDescription = "Favorite",
-                                            tint = if (item.isFavorite) StowLavender else StowInkOnDark,
-                                            modifier = Modifier.size(15.dp)
-                                        )
-                                    }
-                                }
-
-                                if (item.tag.isNotBlank()) {
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = StowLavender,
-                                        modifier = Modifier
-                                            .align(Alignment.BottomStart)
-                                            .padding(8.dp)
-                                    ) {
-                                        Text(
-                                            text = "#${item.tag.uppercase()}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = StowPineDark,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                        )
-                                    }
-                                }
-                            }
-
-                            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-                                Text(
-                                    text = item.creatorHandle.takeIf { it.isNotBlank() }?.let { "@$it" } ?: item.shortcode,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = StowInkOnDark,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = "${dateFormat.format(Date(item.createdAtMs))} · ${formatBytes(item.fileSizeBytes)}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = StowInkMutedOnDark,
-                                    maxLines = 1
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End
+                                IconButton(
+                                    onClick = { menuExpanded = true },
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .background(StowPineDark.copy(alpha = 0.58f), CircleShape)
                                 ) {
-                                    IconButton(onClick = { itemToTag = item }, modifier = Modifier.size(26.dp)) {
-                                        Icon(Icons.Default.Label, contentDescription = "Tag", tint = StowInkMutedOnDark, modifier = Modifier.size(14.dp))
-                                    }
-                                    if (item.sourceUrl.startsWith("http")) {
-                                        IconButton(
-                                            onClick = {
-                                                try {
-                                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.sourceUrl)))
-                                                } catch (_: Exception) {}
-                                            },
-                                            modifier = Modifier.size(26.dp)
-                                        ) {
-                                            Icon(Icons.Default.OpenInNew, contentDescription = "Open", tint = StowInkMutedOnDark, modifier = Modifier.size(14.dp))
-                                        }
-                                    }
-                                    IconButton(
+                                    Icon(
+                                        imageVector = if (item.isFavorite) Icons.Filled.Star else Icons.Default.MoreVert,
+                                        contentDescription = "Options",
+                                        tint = if (item.isFavorite) StowLavender else StowInkOnDark,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = menuExpanded,
+                                    onDismissRequest = { menuExpanded = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text(if (item.isFavorite) "Remove favorite" else "Favorite") },
                                         onClick = {
+                                            menuExpanded = false
+                                            viewModel.toggleFavorite(item)
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Collection tag") },
+                                        onClick = {
+                                            menuExpanded = false
+                                            itemToTag = item
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Share") },
+                                        onClick = {
+                                            menuExpanded = false
                                             try {
                                                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                                     type = when {
@@ -570,15 +517,91 @@ fun LibraryScreen(
                                                 }
                                                 context.startActivity(Intent.createChooser(shareIntent, "Share Media"))
                                             } catch (_: Exception) {}
-                                        },
-                                        modifier = Modifier.size(26.dp)
-                                    ) {
-                                        Icon(Icons.Default.Share, contentDescription = "Share", tint = StowInkMutedOnDark, modifier = Modifier.size(14.dp))
+                                        }
+                                    )
+                                    if (item.sourceUrl.startsWith("http")) {
+                                        DropdownMenuItem(
+                                            text = { Text("Open source link") },
+                                            onClick = {
+                                                menuExpanded = false
+                                                try {
+                                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.sourceUrl)))
+                                                } catch (_: Exception) {}
+                                            }
+                                        )
                                     }
-                                    IconButton(onClick = { deleteWithUndo(item) }, modifier = Modifier.size(26.dp)) {
-                                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = StowInkMutedOnDark, modifier = Modifier.size(14.dp))
-                                    }
+                                    DropdownMenuItem(
+                                        text = { Text("Delete", color = ErrorRedDark) },
+                                        onClick = {
+                                            menuExpanded = false
+                                            deleteWithUndo(item)
+                                        }
+                                    )
                                 }
+                            }
+
+                            // Top-right: Duration / Type badge or Selected check
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = "Selected",
+                                    tint = StowLavender,
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(8.dp)
+                                        .size(22.dp)
+                                )
+                            } else {
+                                val badgeText = when {
+                                    item.durationSec > 0 -> formatDuration(item.durationSec)
+                                    isAudio -> "AUDIO"
+                                    isVideo -> "VIDEO"
+                                    else -> "PHOTO"
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(7.dp),
+                                    color = StowPineDark.copy(alpha = 0.78f),
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(8.dp)
+                                ) {
+                                    Text(
+                                        text = badgeText,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = StowInkOnDark,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+
+                            // Bottom Scrim Text: Real Title + Creator · Size
+                            Column(
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 11.dp, vertical = 10.dp)
+                            ) {
+                                val displayTitle = item.title.takeIf { it.isNotBlank() }
+                                    ?: item.fileName.substringBeforeLast('.')
+                                Text(
+                                    text = displayTitle,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = StowInkOnDark,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                val sub = listOfNotNull(
+                                    item.creatorHandle.takeIf { it.isNotBlank() }?.let { "@$it" },
+                                    formatBytes(item.fileSizeBytes)
+                                ).joinToString(" · ")
+                                Text(
+                                    text = sub,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = StowInkMutedOnDark,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
                         }
                     }
@@ -591,7 +614,7 @@ fun LibraryScreen(
         MediaPreviewDialog(
             mediaUriOrUrl = item.mediaStoreUri,
             isVideo = item.mediaType == "VIDEO",
-            title = item.fileName,
+            title = item.title.ifBlank { item.fileName },
             onDismiss = { previewItem = null }
         )
     }
@@ -672,4 +695,10 @@ fun LibraryScreen(
             shape = RoundedCornerShape(22.dp)
         )
     }
+}
+
+private fun formatDuration(seconds: Int): String {
+    val mins = seconds / 60
+    val secs = seconds % 60
+    return String.format("%d:%02d", mins, secs)
 }

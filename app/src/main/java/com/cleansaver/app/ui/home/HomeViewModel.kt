@@ -3,6 +3,11 @@ package com.cleansaver.app.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.cleansaver.app.data.engine.DownloadQueueManager
+import com.cleansaver.app.data.engine.QueueTask
+import com.cleansaver.app.data.engine.StowFormatOption
+import com.cleansaver.app.data.engine.StowMediaInfo
+import com.cleansaver.app.data.engine.YtDlpEngine
 import com.cleansaver.app.di.AppContainer
 import com.cleansaver.app.domain.model.AppError
 import com.cleansaver.app.domain.model.CustomThrowable
@@ -26,11 +31,17 @@ class HomeViewModel(
     private val validateUrlUseCase: ValidateUrlUseCase,
     private val extractMediaUseCase: ExtractMediaUseCase,
     private val downloadMediaUseCase: DownloadMediaUseCase,
-    private val mediaRepository: MediaRepository
+    private val mediaRepository: MediaRepository,
+    private val ytDlpEngine: YtDlpEngine,
+    private val downloadQueueManager: DownloadQueueManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    val queueTasks: StateFlow<List<QueueTask>> = downloadQueueManager.tasks
+
+    private val urlRegex = Regex("""https?://\S+""", RegexOption.IGNORE_CASE)
 
     fun onUrlChanged(newUrl: String) {
         _uiState.update { it.copy(inputUrl = newUrl, error = null, actionBannerMessage = null) }
@@ -55,6 +66,7 @@ class HomeViewModel(
                     error = null,
                     actionBannerMessage = null,
                     extractionStatus = null,
+                    pendingMediaInfo = null,
                     extractedCandidates = emptyList(),
                     selectedIndices = emptySet(),
                     downloadProgressMap = emptyMap(),
@@ -62,58 +74,94 @@ class HomeViewModel(
                 )
             }
 
-            // Support batch paste (multiple URLs separated by newlines or spaces)
-            val urls = validateUrlUseCase.extractAllUrls(rawInput).ifEmpty { listOf(rawInput) }
-            val parsedUrls = mutableListOf<com.cleansaver.app.domain.model.ParsedUrl>()
-            var firstError: AppError? = null
+            val urls = urlRegex.findAll(rawInput)
+                .map { it.value.trimEnd(',', '.', ')', ']', '>', '"', '\'') }
+                .distinct()
+                .toList()
 
-            for (url in urls) {
-                val validation = validateUrlUseCase(url)
-                if (validation.isSuccess) {
-                    parsedUrls.add(validation.getOrThrow())
-                } else if (firstError == null) {
-                    firstError = (validation.exceptionOrNull() as? CustomThrowable)?.appError ?: AppError.InvalidUrl
-                }
+            if (urls.isEmpty()) {
+                _uiState.update { it.copy(isValidating = false, error = AppError.InvalidUrl) }
+                return@launch
             }
 
-            if (parsedUrls.isEmpty()) {
-                _uiState.update { it.copy(isValidating = false, error = firstError ?: AppError.InvalidUrl) }
+            if (urls.any { it.contains("instagram.com/stories/", ignoreCase = true) }) {
+                _uiState.update { it.copy(isValidating = false, error = AppError.StoriesNotSupported) }
                 return@launch
             }
 
             _uiState.update { it.copy(isValidating = false, isExtracting = true) }
 
-            val allCandidates = mutableListOf<MediaCandidate>()
-            var lastExtractError: AppError? = null
-            var globalSlideIndex = 0
+            // Single link -> fetch formats via yt-dlp and open FormatPickerBottomSheet
+            if (urls.size == 1) {
+                val url = urls.first()
+                _uiState.update { it.copy(extractionStatus = "Fetching available formats...") }
+                val infoResult = ytDlpEngine.fetchMediaInfo(url)
 
-            parsedUrls.forEachIndexed { idx, parsed ->
-                if (parsedUrls.size > 1) {
+                if (infoResult.isSuccess) {
                     _uiState.update {
-                        it.copy(extractionStatus = "Fetching link ${idx + 1} of ${parsedUrls.size}...")
+                        it.copy(
+                            isExtracting = false,
+                            extractionStatus = null,
+                            pendingMediaInfo = infoResult.getOrThrow()
+                        )
                     }
-                    if (idx > 0) delay(1200L) // Polite rate-limit spacing for batch queue
+                    return@launch
                 }
 
-                val result = extractMediaUseCase(parsed)
-                if (result.isSuccess) {
-                    result.getOrThrow().forEach { candidate ->
-                        allCandidates.add(candidate.copy(slideIndex = globalSlideIndex++))
+                // Fallback to legacy extractor chain (handles Instagram photo-only posts / carousels)
+                val parsed = validateUrlUseCase(url).getOrNull()
+                if (parsed != null) {
+                    _uiState.update { it.copy(extractionStatus = "Checking photo/carousel extractor...") }
+                    val fallbackResult = extractMediaUseCase(parsed)
+                    if (fallbackResult.isSuccess) {
+                        val candidates = fallbackResult.getOrThrow()
+                        if (candidates.isNotEmpty()) {
+                            _uiState.update {
+                                it.copy(
+                                    isExtracting = false,
+                                    extractionStatus = null,
+                                    extractedCandidates = candidates,
+                                    selectedIndices = candidates.indices.toSet()
+                                )
+                            }
+                            return@launch
+                        }
                     }
+                }
+
+                val err = (infoResult.exceptionOrNull() as? CustomThrowable)?.appError
+                    ?: AppError.Unknown(infoResult.exceptionOrNull()?.message ?: "Unable to fetch media")
+                _uiState.update {
+                    it.copy(isExtracting = false, extractionStatus = null, error = err)
+                }
+                return@launch
+            }
+
+            // Batch paste (multiple URLs) -> resolve each via yt-dlp & enqueue best MP4 automatically
+            var queuedCount = 0
+            var lastError: AppError? = null
+            urls.forEachIndexed { idx, url ->
+                _uiState.update { it.copy(extractionStatus = "Queuing ${idx + 1} of ${urls.size}...") }
+                if (idx > 0) delay(900L)
+                val infoResult = ytDlpEngine.fetchMediaInfo(url)
+                if (infoResult.isSuccess) {
+                    val info = infoResult.getOrThrow()
+                    val bestFormat = info.videoFormats.firstOrNull() ?: info.audioFormats.first()
+                    downloadQueueManager.enqueue(mediaInfo = info, format = bestFormat)
+                    queuedCount++
                 } else {
-                    lastExtractError = (result.exceptionOrNull() as? CustomThrowable)?.appError
-                        ?: AppError.Unknown(result.exceptionOrNull()?.message ?: "Extraction failed")
+                    lastError = (infoResult.exceptionOrNull() as? CustomThrowable)?.appError
+                        ?: AppError.Unknown(infoResult.exceptionOrNull()?.message ?: "Failed to queue link")
                 }
             }
 
-            if (allCandidates.isNotEmpty()) {
+            if (queuedCount > 0) {
                 _uiState.update {
                     it.copy(
                         isExtracting = false,
                         extractionStatus = null,
-                        extractedCandidates = allCandidates,
-                        selectedIndices = allCandidates.indices.toSet(),
-                        downloadProgressMap = emptyMap()
+                        inputUrl = "",
+                        actionBannerMessage = "Queued $queuedCount download${if (queuedCount > 1) "s" else ""}"
                     )
                 }
             } else {
@@ -121,11 +169,52 @@ class HomeViewModel(
                     it.copy(
                         isExtracting = false,
                         extractionStatus = null,
-                        error = lastExtractError ?: AppError.ParserOutdated
+                        error = lastError ?: AppError.ParserOutdated
                     )
                 }
             }
         }
+    }
+
+    fun enqueueDownload(
+        mediaInfo: StowMediaInfo,
+        format: StowFormatOption,
+        embedSubtitles: Boolean,
+        embedThumbnail: Boolean
+    ) {
+        downloadQueueManager.enqueue(
+            mediaInfo = mediaInfo,
+            format = format,
+            embedSubtitles = embedSubtitles,
+            embedThumbnail = embedThumbnail
+        )
+        _uiState.update {
+            it.copy(
+                pendingMediaInfo = null,
+                inputUrl = "",
+                actionBannerMessage = "Downloading ${mediaInfo.title.take(36)}"
+            )
+        }
+    }
+
+    fun dismissFormatSheet() {
+        _uiState.update { it.copy(pendingMediaInfo = null) }
+    }
+
+    fun cancelQueueTask(taskId: String) {
+        downloadQueueManager.cancel(taskId)
+    }
+
+    fun retryQueueTask(taskId: String) {
+        downloadQueueManager.retry(taskId)
+    }
+
+    fun removeQueueTask(taskId: String) {
+        downloadQueueManager.remove(taskId)
+    }
+
+    fun clearCompletedQueue() {
+        downloadQueueManager.clearCompleted()
     }
 
     fun toggleCandidateSelection(index: Int) {
@@ -172,10 +261,7 @@ class HomeViewModel(
 
     fun onDownloadAudio(candidate: MediaCandidate) {
         if (candidate.mediaType != MediaType.VIDEO) return
-        val audioCandidate = candidate.copy(
-            mediaType = MediaType.AUDIO,
-            slideIndex = candidate.slideIndex
-        )
+        val audioCandidate = candidate.copy(mediaType = MediaType.AUDIO)
         viewModelScope.launch {
             _uiState.update { it.copy(isDownloading = true, actionBannerMessage = "Extracting audio (.m4a)...") }
             collectDownloadFlow(listOf(audioCandidate))
@@ -239,7 +325,9 @@ class HomeViewModel(
                         validateUrlUseCase = container.validateUrlUseCase,
                         extractMediaUseCase = container.extractMediaUseCase,
                         downloadMediaUseCase = container.downloadMediaUseCase,
-                        mediaRepository = container.mediaRepository
+                        mediaRepository = container.mediaRepository,
+                        ytDlpEngine = container.ytDlpEngine,
+                        downloadQueueManager = container.downloadQueueManager
                     ) as T
                 }
             }

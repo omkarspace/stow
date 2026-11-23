@@ -26,6 +26,8 @@ data class DownloadedMediaEntity(
     @ColumnInfo(name = "file_size_bytes") val fileSizeBytes: Long,
     @ColumnInfo(name = "source_url") val sourceUrl: String,
     @ColumnInfo(name = "created_at_ms") val createdAtMs: Long,
+    @ColumnInfo(name = "title") val title: String = "",
+    @ColumnInfo(name = "duration_sec") val durationSec: Int = 0,
     @ColumnInfo(name = "caption") val caption: String = "",
     @ColumnInfo(name = "creator_handle") val creatorHandle: String = "",
     @ColumnInfo(name = "platform") val platform: String = "INSTAGRAM",
@@ -63,7 +65,7 @@ interface DownloadedMediaDao {
     suspend fun clearAll()
 }
 
-@Database(entities = [DownloadedMediaEntity::class], version = 2, exportSchema = false)
+@Database(entities = [DownloadedMediaEntity::class], version = 3, exportSchema = false)
 abstract class CleanSaverDatabase : RoomDatabase() {
     abstract fun downloadedMediaDao(): DownloadedMediaDao
 }

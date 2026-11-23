@@ -56,3 +56,8 @@
     <init>(...);
 }
 
+# youtubedl-android / yt-dlp / FFmpeg / Aria2c
+-keep class com.yausername.** { *; }
+-dontwarn com.yausername.**
+
+

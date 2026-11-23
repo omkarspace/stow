@@ -52,3 +52,4 @@ object LibraryBackupManager {
         context.startActivity(Intent.createChooser(intent, "Export Stow Library JSON"))
     }
 }
+

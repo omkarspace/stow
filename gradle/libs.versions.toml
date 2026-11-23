@@ -16,6 +16,7 @@ work = "2.9.1"
 coil = "2.7.0"
 media3 = "1.4.1"
 splashscreen = "1.0.1"
+youtubedlAndroid = "0.18.1"
 junitJupiter = "5.11.3"
 junit = "4.13.2"
 androidxTestExt = "1.2.1"
@@ -62,6 +63,11 @@ androidx-biometric = { group = "androidx.biometric", name = "biometric", version
 # Modern Media3 ExoPlayer
 androidx-media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
 androidx-media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3" }
+
+# Universal Client-Side yt-dlp Engine (1,000+ sites)
+youtubedl-library = { group = "io.github.junkfood02.youtubedl-android", name = "library", version.ref = "youtubedlAndroid" }
+youtubedl-ffmpeg = { group = "io.github.junkfood02.youtubedl-android", name = "ffmpeg", version.ref = "youtubedlAndroid" }
+youtubedl-aria2c = { group = "io.github.junkfood02.youtubedl-android", name = "aria2c", version.ref = "youtubedlAndroid" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }
