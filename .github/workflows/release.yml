@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   release:
-    name: Build & Release CleanSaver APK
+    name: Build & Release Stow APK
     runs-on: ubuntu-latest
 
     steps:
@@ -71,7 +71,7 @@ jobs:
     - name: Upload Release APKs Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: cleansaver-release-apks
+        name: stow-release-apks
         path: |
           app/build/outputs/apk/release/*.apk
           app/build/outputs/apk/release/checksums.txt
