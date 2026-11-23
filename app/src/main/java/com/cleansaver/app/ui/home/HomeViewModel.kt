@@ -7,14 +7,18 @@ import com.cleansaver.app.di.AppContainer
 import com.cleansaver.app.domain.model.AppError
 import com.cleansaver.app.domain.model.CustomThrowable
 import com.cleansaver.app.domain.model.DownloadProgress
+import com.cleansaver.app.domain.model.MediaCandidate
+import com.cleansaver.app.domain.model.MediaType
 import com.cleansaver.app.domain.repository.MediaRepository
 import com.cleansaver.app.domain.usecase.DownloadMediaUseCase
 import com.cleansaver.app.domain.usecase.ExtractMediaUseCase
 import com.cleansaver.app.domain.usecase.ValidateUrlUseCase
 import com.cleansaver.app.ui.state.HomeUiState
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -29,7 +33,7 @@ class HomeViewModel(
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     fun onUrlChanged(newUrl: String) {
-        _uiState.update { it.copy(inputUrl = newUrl, error = null) }
+        _uiState.update { it.copy(inputUrl = newUrl, error = null, actionBannerMessage = null) }
     }
 
     fun onPaste(text: String) {
@@ -40,8 +44,8 @@ class HomeViewModel(
     }
 
     fun onExtract() {
-        val currentUrl = _uiState.value.inputUrl.trim()
-        if (currentUrl.isEmpty()) return
+        val rawInput = _uiState.value.inputUrl.trim()
+        if (rawInput.isEmpty()) return
 
         viewModelScope.launch {
             _uiState.update {
@@ -49,6 +53,8 @@ class HomeViewModel(
                     isValidating = true,
                     isDownloading = false,
                     error = null,
+                    actionBannerMessage = null,
+                    extractionStatus = null,
                     extractedCandidates = emptyList(),
                     selectedIndices = emptySet(),
                     downloadProgressMap = emptyMap(),
@@ -56,31 +62,68 @@ class HomeViewModel(
                 )
             }
 
-            val validationResult = validateUrlUseCase(currentUrl)
-            if (validationResult.isFailure) {
-                val error = (validationResult.exceptionOrNull() as? CustomThrowable)?.appError ?: AppError.InvalidUrl
-                _uiState.update { it.copy(isValidating = false, error = error) }
+            // Support batch paste (multiple URLs separated by newlines or spaces)
+            val urls = validateUrlUseCase.extractAllUrls(rawInput).ifEmpty { listOf(rawInput) }
+            val parsedUrls = mutableListOf<com.cleansaver.app.domain.model.ParsedUrl>()
+            var firstError: AppError? = null
+
+            for (url in urls) {
+                val validation = validateUrlUseCase(url)
+                if (validation.isSuccess) {
+                    parsedUrls.add(validation.getOrThrow())
+                } else if (firstError == null) {
+                    firstError = (validation.exceptionOrNull() as? CustomThrowable)?.appError ?: AppError.InvalidUrl
+                }
+            }
+
+            if (parsedUrls.isEmpty()) {
+                _uiState.update { it.copy(isValidating = false, error = firstError ?: AppError.InvalidUrl) }
                 return@launch
             }
 
-            val parsedUrl = validationResult.getOrThrow()
             _uiState.update { it.copy(isValidating = false, isExtracting = true) }
 
-            val extractionResult = extractMediaUseCase(parsedUrl)
-            if (extractionResult.isSuccess) {
-                val candidates = extractionResult.getOrThrow()
+            val allCandidates = mutableListOf<MediaCandidate>()
+            var lastExtractError: AppError? = null
+            var globalSlideIndex = 0
+
+            parsedUrls.forEachIndexed { idx, parsed ->
+                if (parsedUrls.size > 1) {
+                    _uiState.update {
+                        it.copy(extractionStatus = "Fetching link ${idx + 1} of ${parsedUrls.size}...")
+                    }
+                    if (idx > 0) delay(1200L) // Polite rate-limit spacing for batch queue
+                }
+
+                val result = extractMediaUseCase(parsed)
+                if (result.isSuccess) {
+                    result.getOrThrow().forEach { candidate ->
+                        allCandidates.add(candidate.copy(slideIndex = globalSlideIndex++))
+                    }
+                } else {
+                    lastExtractError = (result.exceptionOrNull() as? CustomThrowable)?.appError
+                        ?: AppError.Unknown(result.exceptionOrNull()?.message ?: "Extraction failed")
+                }
+            }
+
+            if (allCandidates.isNotEmpty()) {
                 _uiState.update {
                     it.copy(
                         isExtracting = false,
-                        extractedCandidates = candidates,
-                        selectedIndices = candidates.indices.toSet(),
+                        extractionStatus = null,
+                        extractedCandidates = allCandidates,
+                        selectedIndices = allCandidates.indices.toSet(),
                         downloadProgressMap = emptyMap()
                     )
                 }
             } else {
-                val error = (extractionResult.exceptionOrNull() as? CustomThrowable)?.appError
-                    ?: AppError.Unknown(extractionResult.exceptionOrNull()?.message ?: "Extraction failed")
-                _uiState.update { it.copy(isExtracting = false, error = error) }
+                _uiState.update {
+                    it.copy(
+                        isExtracting = false,
+                        extractionStatus = null,
+                        error = lastExtractError ?: AppError.ParserOutdated
+                    )
+                }
             }
         }
     }
@@ -88,11 +131,7 @@ class HomeViewModel(
     fun toggleCandidateSelection(index: Int) {
         _uiState.update { state ->
             val updated = state.selectedIndices.toMutableSet()
-            if (updated.contains(index)) {
-                updated.remove(index)
-            } else {
-                updated.add(index)
-            }
+            if (updated.contains(index)) updated.remove(index) else updated.add(index)
             state.copy(selectedIndices = updated)
         }
     }
@@ -126,10 +165,48 @@ class HomeViewModel(
                 }
             }
 
-            _uiState.update { it.copy(showDuplicatePrompt = false, isDownloading = true) }
-            downloadMediaUseCase(candidatesToDownload).collect { progressBySlide ->
+            _uiState.update { it.copy(showDuplicatePrompt = false, isDownloading = true, actionBannerMessage = null) }
+            collectDownloadFlow(candidatesToDownload)
+        }
+    }
+
+    fun onDownloadAudio(candidate: MediaCandidate) {
+        if (candidate.mediaType != MediaType.VIDEO) return
+        val audioCandidate = candidate.copy(
+            mediaType = MediaType.AUDIO,
+            slideIndex = candidate.slideIndex
+        )
+        viewModelScope.launch {
+            _uiState.update { it.copy(isDownloading = true, actionBannerMessage = "Extracting audio (.m4a)...") }
+            collectDownloadFlow(listOf(audioCandidate))
+            _uiState.update { it.copy(actionBannerMessage = "Audio saved to Music folder") }
+        }
+    }
+
+    fun onDownloadCover(candidate: MediaCandidate) {
+        val thumbUrl = candidate.thumbnailUrl ?: return
+        val coverCandidate = candidate.copy(
+            mediaType = MediaType.IMAGE,
+            downloadUrl = thumbUrl,
+            slideIndex = candidate.slideIndex + 1000
+        )
+        viewModelScope.launch {
+            _uiState.update { it.copy(actionBannerMessage = "Saving cover image...") }
+            collectDownloadFlow(listOf(coverCandidate))
+            _uiState.update { it.copy(actionBannerMessage = "Cover image saved to Gallery") }
+        }
+    }
+
+    private suspend fun collectDownloadFlow(targets: List<MediaCandidate>) {
+        var finished = false
+        downloadMediaUseCase(targets)
+            .takeWhile { !finished }
+            .collect { progressBySlide ->
                 val isStillRunning = progressBySlide.values.any {
                     it is DownloadProgress.Queued || it is DownloadProgress.Running
+                }
+                if (!isStillRunning && progressBySlide.isNotEmpty()) {
+                    finished = true
                 }
                 _uiState.update { state ->
                     state.copy(
@@ -138,8 +215,7 @@ class HomeViewModel(
                     )
                 }
             }
-            _uiState.update { it.copy(isDownloading = false) }
-        }
+        _uiState.update { it.copy(isDownloading = false) }
     }
 
     fun dismissDuplicatePrompt() {
@@ -148,6 +224,10 @@ class HomeViewModel(
 
     fun dismissError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    fun clearBanner() {
+        _uiState.update { it.copy(actionBannerMessage = null) }
     }
 
     companion object {

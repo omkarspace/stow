@@ -1,10 +1,12 @@
 package com.cleansaver.app.ui.home
 
+import android.content.ClipData
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -31,8 +33,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ErrorOutline
@@ -41,6 +45,7 @@ import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -52,6 +57,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -69,7 +75,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.cleansaver.app.domain.model.AppError
@@ -87,26 +93,31 @@ fun HomeScreen(viewModel: HomeViewModel) {
     val successColor = if (isSystemInDarkTheme()) SuccessGreenDark else SuccessGreenLight
     var previewCandidate by remember { mutableStateOf<MediaCandidate?>(null) }
 
+    fun copyToClipboard(label: String, text: String) {
+        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        cm?.setPrimaryClip(ClipData.newPlainText(label, text))
+        Toast.makeText(context, "$label copied", Toast.LENGTH_SHORT).show()
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 24.dp)
     ) {
-        // Minimal Header
         Text(
             text = "CleanSaver",
             style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.onBackground
         )
         Text(
-            text = "Save public Reels, posts, and carousels directly to your gallery.",
-            style = MaterialTheme.typography.bodyMedium,
+            text = "Instagram · Threads · X · Reddit · Pinterest",
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
+            modifier = Modifier.padding(top = 4.dp, bottom = 22.dp)
         )
 
-        // Minimal Input Surface
+        // Minimal Input Surface (supports single or multi-line batch URLs)
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -119,7 +130,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     onValueChange = { viewModel.onUrlChanged(it) },
                     placeholder = {
                         Text(
-                            text = "Paste Instagram link...",
+                            text = "Paste link(s) — one per line for batch...",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -161,7 +172,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                             }
                         }
                     },
-                    singleLine = true,
+                    minLines = 1,
+                    maxLines = 4,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -195,7 +207,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = if (state.isValidating) "Validating..." else "Fetching media...",
+                            text = state.extractionStatus
+                                ?: if (state.isValidating) "Validating..." else "Fetching media...",
                             style = MaterialTheme.typography.labelLarge
                         )
                     } else {
@@ -208,7 +221,36 @@ fun HomeScreen(viewModel: HomeViewModel) {
             }
         }
 
-        // Subtle Idle Tip (only when no error and no extracted items)
+        state.actionBannerMessage?.let { msg ->
+            Spacer(modifier = Modifier.height(12.dp))
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = msg,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = { viewModel.clearBanner() }, modifier = Modifier.size(24.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.Clear,
+                            contentDescription = "Dismiss",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+        }
+
         if (state.extractedCandidates.isEmpty() && state.error == null && !state.isExtracting && !state.isValidating) {
             Spacer(modifier = Modifier.height(20.dp))
             Surface(
@@ -218,13 +260,15 @@ fun HomeScreen(viewModel: HomeViewModel) {
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Quick tip",
+                        text = "Quick tips",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Share any public Reel, post, or carousel directly from Instagram to CleanSaver for one-tap saving. No login required.",
+                        text = "• Share any public post directly from Instagram, X, Threads, Reddit, or Pinterest.\n" +
+                            "• Paste multiple URLs (one per line) to batch-queue.\n" +
+                            "• Add the CleanSaver Quick Settings tile for 1-tap paste.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -297,7 +341,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                 ) {
                     Column {
                         Text(
-                            text = if (state.extractedCandidates.size == 1) "Ready to save" else "Carousel (${state.extractedCandidates.size} items)",
+                            text = if (state.extractedCandidates.size == 1) "Ready to save" else "${state.extractedCandidates.size} items found",
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onBackground
                         )
@@ -388,7 +432,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
-                                            text = if (candidate.mediaType == MediaType.VIDEO) "Video" else "Photo",
+                                            text = "${candidate.platform.displayName} · ${if (candidate.mediaType == MediaType.VIDEO) "Video" else "Photo"}",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
@@ -398,9 +442,11 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                 Spacer(modifier = Modifier.width(8.dp))
 
                                 Text(
-                                    text = if (state.extractedCandidates.size > 1) "Slide ${index + 1}" else candidate.shortcode,
+                                    text = candidate.creatorHandle?.let { "@$it" } ?: candidate.shortcode,
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.weight(1f)
                                 )
 
@@ -445,6 +491,83 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                 contentDescription = "Play Preview",
                                                 tint = Color.White,
                                                 modifier = Modifier.padding(10.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Caption & Hashtag copy actions
+                            candidate.caption?.takeIf { it.isNotBlank() }?.let { caption ->
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = caption,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                val hashtags = remember(caption) { candidate.extractHashtags() }
+                                Row(
+                                    modifier = Modifier.padding(top = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    TextButton(onClick = { copyToClipboard("Caption", caption) }) {
+                                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Copy caption", style = MaterialTheme.typography.labelSmall)
+                                    }
+                                    if (hashtags.isNotEmpty()) {
+                                        TextButton(onClick = { copyToClipboard("Hashtags", hashtags.joinToString(" ")) }) {
+                                            Icon(Icons.Default.Tag, contentDescription = null, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Hashtags (${hashtags.size})", style = MaterialTheme.typography.labelSmall)
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Video extras: Audio-only (.m4a) & Cover Image
+                            if (candidate.mediaType == MediaType.VIDEO) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(
+                                        onClick = { viewModel.onDownloadAudio(candidate) },
+                                        enabled = !state.isDownloading,
+                                        shape = RoundedCornerShape(10.dp),
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.AudioFile,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(15.dp),
+                                            tint = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "Audio (.m4a)",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                    if (!candidate.thumbnailUrl.isNullOrBlank()) {
+                                        OutlinedButton(
+                                            onClick = { viewModel.onDownloadCover(candidate) },
+                                            enabled = !state.isDownloading,
+                                            shape = RoundedCornerShape(10.dp),
+                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Image,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(15.dp),
+                                                tint = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "Save cover",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurface
                                             )
                                         }
                                     }
@@ -521,9 +644,11 @@ fun HomeScreen(viewModel: HomeViewModel) {
                                                 )
                                                 Spacer(modifier = Modifier.width(6.dp))
                                                 Text(
-                                                    text = "Saved to Gallery",
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    color = successColor
+                                                    text = "Saved (${progress.fileName})",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = successColor,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
                                             }
                                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -643,12 +768,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissDuplicatePrompt() },
             containerColor = MaterialTheme.colorScheme.surface,
-            title = {
-                Text(
-                    text = "Already saved",
-                    style = MaterialTheme.typography.titleLarge
-                )
-            },
+            title = { Text("Already saved", style = MaterialTheme.typography.titleLarge) },
             text = {
                 Text(
                     text = "This post is already in your library. Save another copy?",
@@ -676,13 +796,14 @@ fun HomeScreen(viewModel: HomeViewModel) {
 }
 
 internal fun formatAppError(err: AppError): String = when (err) {
-    is AppError.InvalidUrl -> "Enter a valid public Instagram Reel or Post link."
+    is AppError.InvalidUrl -> "Enter a valid public Instagram, Threads, X, Reddit, or Pinterest link."
     is AppError.StoriesNotSupported -> "Instagram Stories are private/ephemeral and not supported."
     is AppError.PrivateAccountNotSupported -> "Media from private accounts cannot be accessed."
     is AppError.PostNotFound -> "Post was not found or has been removed."
-    is AppError.NetworkRateLimited -> "Instagram rate-limited this request. Try again in a moment."
+    is AppError.NetworkRateLimited -> "Rate-limited by platform. Try again in a moment."
     is AppError.ParserOutdated -> "Could not parse this post. Try syncing parser rules in Settings."
     is AppError.NoInternet -> "No internet connection. Check your network and try again."
+    is AppError.WifiOnlyBlocked -> "Wi-Fi Only mode is enabled. Connect to Wi-Fi or turn it off in Settings."
     is AppError.StorageError -> "Storage error: ${err.reason}"
     is AppError.Unknown -> err.message
 }

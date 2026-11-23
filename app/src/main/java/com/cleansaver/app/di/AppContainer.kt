@@ -8,6 +8,7 @@ import androidx.room.Room
 import com.cleansaver.app.data.extractor.EmbedHttpExtractor
 import com.cleansaver.app.data.extractor.EphemeralWebViewExtractor
 import com.cleansaver.app.data.extractor.MediaExtractorChain
+import com.cleansaver.app.data.extractor.MultiPlatformExtractor
 import com.cleansaver.app.data.local.CleanSaverDatabase
 import com.cleansaver.app.data.local.DownloadedMediaDao
 import com.cleansaver.app.data.local.MediaStoreWriter
@@ -24,6 +25,7 @@ import com.cleansaver.app.domain.usecase.DownloadMediaUseCase
 import com.cleansaver.app.domain.usecase.ExtractMediaUseCase
 import com.cleansaver.app.domain.usecase.RefreshConfigUseCase
 import com.cleansaver.app.domain.usecase.ValidateUrlUseCase
+import com.cleansaver.app.util.AppUpdateChecker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -64,6 +66,10 @@ class AppContainer(private val context: Context) {
             .build()
     }
 
+    val appUpdateChecker: AppUpdateChecker by lazy {
+        AppUpdateChecker(okHttpClient, json)
+    }
+
     val database: CleanSaverDatabase by lazy {
         Room.databaseBuilder(
             context.applicationContext,
@@ -96,13 +102,18 @@ class AppContainer(private val context: Context) {
         EphemeralWebViewExtractor(context)
     }
 
+    val multiPlatformExtractor: MultiPlatformExtractor by lazy {
+        MultiPlatformExtractor(okHttpClient, json)
+    }
+
     val mediaExtractorChain: MediaExtractorChain by lazy {
         MediaExtractorChain(
             remoteConfigRepository = remoteConfigRepository,
             strategies = mapOf(
                 embedHttpExtractor.id to embedHttpExtractor,
                 ephemeralWebViewExtractor.id to ephemeralWebViewExtractor
-            )
+            ),
+            multiPlatformExtractor = multiPlatformExtractor
         )
     }
 
@@ -120,6 +131,7 @@ class AppContainer(private val context: Context) {
             extractorChain = mediaExtractorChain,
             mediaStoreWriter = mediaStoreWriter,
             downloadedMediaDao = downloadedMediaDao,
+            userPrefsRepository = userPrefsRepository,
             okHttpClient = okHttpClient,
             validateUrlUseCase = validateUrlUseCase,
             applicationScope = applicationScope

@@ -5,12 +5,21 @@ import kotlinx.serialization.Serializable
 
 enum class MediaType {
     VIDEO,
-    IMAGE
+    IMAGE,
+    AUDIO
 }
 
 enum class UrlKind {
     REEL,
     POST
+}
+
+enum class Platform(val displayName: String) {
+    INSTAGRAM("Instagram"),
+    THREADS("Threads"),
+    X_TWITTER("X"),
+    REDDIT("Reddit"),
+    PINTEREST("Pinterest")
 }
 
 @Keep
@@ -19,7 +28,8 @@ data class ParsedUrl(
     val rawUrl: String,
     val canonicalUrl: String,
     val shortcode: String,
-    val kind: UrlKind
+    val kind: UrlKind,
+    val platform: Platform = Platform.INSTAGRAM
 )
 
 @Keep
@@ -31,6 +41,14 @@ data class MediaCandidate(
     val downloadUrl: String,
     val thumbnailUrl: String? = null,
     val width: Int? = null,
-    val height: Int? = null
-)
-
+    val height: Int? = null,
+    val caption: String? = null,
+    val creatorHandle: String? = null,
+    val platform: Platform = Platform.INSTAGRAM,
+    val sourceUrl: String? = null
+) {
+    fun extractHashtags(): List<String> {
+        if (caption.isNullOrBlank()) return emptyList()
+        return Regex("#[A-Za-z0-9_]+").findAll(caption).map { it.value }.distinct().toList()
+    }
+}

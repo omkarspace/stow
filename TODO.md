@@ -113,3 +113,21 @@ This document tracks the end-to-end engineering implementation of **CleanSaver**
 - [x] `MediaExtractorChainTest` (strategy execution order, private account failure, maintenance mode)
 - [x] `MediaStoreWriterNamingTest` (validates file naming, mime types, and target directory mappings)
 - [x] `RemoteConfigNetworkTest` (validates HTTP 200 parsing and HTTP 304 ETag caching)
+
+---
+
+## Phase 8: v2.0 Power Features & Minimalist Polish
+- [x] Native Audio-Only Extraction (`.m4a` via Android `MediaExtractor` + `MediaMuxer`, 0 MB FFmpeg bloat)
+- [x] Caption, Hashtags & Creator Metadata Extraction + 1-tap Copy Caption / Copy Hashtags
+- [x] 1-Tap Instant Auto-Save on Share Sheet toggle
+- [x] Batch Queue (multi-line URL paste with polite rate-limit pacing)
+- [x] Cover / Thumbnail Save option on Videos
+- [x] Multi-Platform Modular Extractors (Instagram, Threads, X/Twitter, Reddit, Pinterest)
+- [x] Smart Library: Favorites, Custom Collection Tags, Multi-Select Bulk Share & Bulk Delete, Sort (Newest/Oldest/Largest/Creator), Storage Breakdown
+- [x] Custom File Naming (`CleanSaver_code` vs `Creator_Date`) & Custom Gallery Subfolder
+- [x] Biometric Vault Lock (`BiometricPrompt` gating Library tab)
+- [x] Stream Quality Preference (`Best` / `Data Saver`) & Wi-Fi Only Downloads Guard
+- [x] Built-in Extraction Diagnostics Log viewer in Settings
+- [x] In-App GitHub Releases Update Checker
+- [x] Android Quick Settings Tile (`QuickSaveTileService`) for 1-tap Paste & Save
+- [x] Unit tests for multi-platform URLs, batch parsing, hashtags, semver update check, and custom file naming

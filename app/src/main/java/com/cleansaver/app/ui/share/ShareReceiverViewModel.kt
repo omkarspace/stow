@@ -8,6 +8,7 @@ import com.cleansaver.app.domain.model.AppError
 import com.cleansaver.app.domain.model.CustomThrowable
 import com.cleansaver.app.domain.model.DownloadProgress
 import com.cleansaver.app.domain.model.MediaCandidate
+import com.cleansaver.app.domain.repository.UserPrefsRepository
 import com.cleansaver.app.domain.usecase.DownloadMediaUseCase
 import com.cleansaver.app.domain.usecase.ExtractMediaUseCase
 import com.cleansaver.app.domain.usecase.ValidateUrlUseCase
@@ -15,12 +16,15 @@ import com.cleansaver.app.ui.state.ShareSheetUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 
 class ShareReceiverViewModel(
     private val validateUrlUseCase: ValidateUrlUseCase,
     private val extractMediaUseCase: ExtractMediaUseCase,
-    private val downloadMediaUseCase: DownloadMediaUseCase
+    private val downloadMediaUseCase: DownloadMediaUseCase,
+    private val userPrefsRepository: UserPrefsRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ShareSheetUiState>(ShareSheetUiState.Idle)
@@ -46,7 +50,12 @@ class ShareReceiverViewModel(
             val extraction = extractMediaUseCase(parsedUrl)
             if (extraction.isSuccess) {
                 val candidates = extraction.getOrThrow()
-                _uiState.value = ShareSheetUiState.PreviewReady(candidates)
+                val instantSave = userPrefsRepository.instantShareSave.first()
+                if (instantSave) {
+                    startDownload(candidates)
+                } else {
+                    _uiState.value = ShareSheetUiState.PreviewReady(candidates)
+                }
             } else {
                 val error = (extraction.exceptionOrNull() as? CustomThrowable)?.appError
                     ?: AppError.Unknown(extraction.exceptionOrNull()?.message ?: "Failed to extract media")
@@ -62,23 +71,28 @@ class ShareReceiverViewModel(
             val initialMap = candidates.associate { it.slideIndex to (DownloadProgress.Queued as DownloadProgress) }
             _uiState.value = ShareSheetUiState.Downloading(initialMap)
 
-            downloadMediaUseCase(candidates).collect { currentMap ->
-                val allCompleted = currentMap.isNotEmpty() && currentMap.values.all { it is DownloadProgress.Completed }
-                val firstFailure = currentMap.values.filterIsInstance<DownloadProgress.Failed>().firstOrNull()
-                val anyRunning = currentMap.values.any { it is DownloadProgress.Queued || it is DownloadProgress.Running }
+            var finished = false
+            downloadMediaUseCase(candidates)
+                .takeWhile { !finished }
+                .collect { currentMap ->
+                    val allCompleted = currentMap.isNotEmpty() && currentMap.values.all { it is DownloadProgress.Completed }
+                    val firstFailure = currentMap.values.filterIsInstance<DownloadProgress.Failed>().firstOrNull()
+                    val anyRunning = currentMap.values.any { it is DownloadProgress.Queued || it is DownloadProgress.Running }
 
-                when {
-                    allCompleted -> {
-                        _uiState.value = ShareSheetUiState.Completed(currentMap.size)
-                    }
-                    !anyRunning && firstFailure != null -> {
-                        _uiState.value = ShareSheetUiState.Error(firstFailure.error)
-                    }
-                    else -> {
-                        _uiState.value = ShareSheetUiState.Downloading(currentMap)
+                    when {
+                        allCompleted -> {
+                            finished = true
+                            _uiState.value = ShareSheetUiState.Completed(currentMap.size)
+                        }
+                        !anyRunning && firstFailure != null -> {
+                            finished = true
+                            _uiState.value = ShareSheetUiState.Error(firstFailure.error)
+                        }
+                        else -> {
+                            _uiState.value = ShareSheetUiState.Downloading(currentMap)
+                        }
                     }
                 }
-            }
         }
     }
 
@@ -90,7 +104,8 @@ class ShareReceiverViewModel(
                     return ShareReceiverViewModel(
                         validateUrlUseCase = container.validateUrlUseCase,
                         extractMediaUseCase = container.extractMediaUseCase,
-                        downloadMediaUseCase = container.downloadMediaUseCase
+                        downloadMediaUseCase = container.downloadMediaUseCase,
+                        userPrefsRepository = container.userPrefsRepository
                     ) as T
                 }
             }

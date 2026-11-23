@@ -37,6 +37,30 @@ class LibraryRepositoryImpl(
         }
     }
 
+    override suspend fun deleteMultiple(items: List<DownloadedMediaEntity>): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            items.forEach { item ->
+                if (item.mediaStoreUri.isNotBlank()) {
+                    try {
+                        context.contentResolver.delete(Uri.parse(item.mediaStoreUri), null, null)
+                    } catch (_: Exception) {}
+                }
+            }
+            downloadedMediaDao.deleteByIds(items.map { it.id })
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun setFavorite(id: Long, isFavorite: Boolean) = withContext(Dispatchers.IO) {
+        downloadedMediaDao.setFavorite(id, isFavorite)
+    }
+
+    override suspend fun setTag(id: Long, tag: String) = withContext(Dispatchers.IO) {
+        downloadedMediaDao.setTag(id, tag.trim().take(24))
+    }
+
     override suspend fun clearHistory(): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             downloadedMediaDao.clearAll()

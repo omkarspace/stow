@@ -6,7 +6,9 @@ import com.cleansaver.app.domain.model.CustomThrowable
 import com.cleansaver.app.domain.model.MediaCandidate
 import com.cleansaver.app.domain.model.MediaType
 import com.cleansaver.app.domain.model.ParsedUrl
+import com.cleansaver.app.domain.model.Platform
 import com.cleansaver.app.domain.model.UrlKind
+import com.cleansaver.app.util.ExtractionLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.CookieJar
@@ -43,6 +45,13 @@ class EmbedHttpExtractor(
         """<meta[^>]+property=["']og:image["'][^>]+content=["'](https?://[^"']+)["']""",
         Pattern.CASE_INSENSITIVE
     )
+    private val ogDescPattern = Pattern.compile(
+        """<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']""",
+        Pattern.CASE_INSENSITIVE
+    )
+    private val usernameJsonPattern = Pattern.compile(
+        """\\?"username\\?"\s*:\s*\\?"([A-Za-z0-9._]{1,30})\\?""""
+    )
     private val embeddedImgPattern = Pattern.compile(
         """<img[^>]+class=["'][^"']*EmbeddedMediaImage[^"']*["'][^>]+src=["'](https?://[^"']+)["']""",
         Pattern.CASE_INSENSITIVE
@@ -64,6 +73,7 @@ class EmbedHttpExtractor(
                 strategyConfig.endpointTemplate
             }
             val targetUrl = baseTemplate.replace("{shortcode}", parsedUrl.shortcode)
+            ExtractionLogger.log("HTTP_EMBED", "GET $targetUrl")
 
             val client = baseOkHttpClient.newBuilder()
                 .connectTimeout(strategyConfig.timeoutMs, TimeUnit.MILLISECONDS)
@@ -82,6 +92,7 @@ class EmbedHttpExtractor(
                 .build()
 
             client.newCall(request).execute().use { response ->
+                ExtractionLogger.log("HTTP_EMBED", "HTTP ${response.code}")
                 if (response.code == 404) return@withContext Result.failure(CustomThrowable(AppError.PostNotFound))
                 if (response.code == 429) return@withContext Result.failure(CustomThrowable(AppError.NetworkRateLimited))
                 if (!response.isSuccessful) return@withContext Result.failure(CustomThrowable(AppError.ParserOutdated))
@@ -90,22 +101,34 @@ class EmbedHttpExtractor(
                 if (body.contains("This Account is Private", ignoreCase = true) ||
                     body.contains("\"is_private\":true", ignoreCase = true)
                 ) {
+                    ExtractionLogger.log("HTTP_EMBED", "Private account detected")
                     return@withContext Result.failure(CustomThrowable(AppError.PrivateAccountNotSupported))
                 }
 
-                val candidates = parseCandidatesFromHtml(body, parsedUrl.shortcode, parsedUrl.kind, strategyConfig)
+                val candidates = parseCandidatesFromHtml(
+                    body = body,
+                    shortcode = parsedUrl.shortcode,
+                    urlKind = parsedUrl.kind,
+                    sourceUrl = parsedUrl.canonicalUrl,
+                    strategyConfig = strategyConfig
+                )
 
                 if (candidates.isNotEmpty()) {
+                    ExtractionLogger.log("HTTP_EMBED", "Extracted ${candidates.size} item(s)")
                     Result.success(candidates)
                 } else {
+                    ExtractionLogger.log("HTTP_EMBED", "No matching media in HTML; falling back")
                     Result.failure(CustomThrowable(AppError.ParserOutdated))
                 }
             }
         } catch (e: UnknownHostException) {
+            ExtractionLogger.log("HTTP_EMBED", "Offline: ${e.message}")
             Result.failure(CustomThrowable(AppError.NoInternet))
         } catch (e: IOException) {
+            ExtractionLogger.log("HTTP_EMBED", "IO error: ${e.message}")
             Result.failure(CustomThrowable(AppError.NoInternet))
         } catch (e: Exception) {
+            ExtractionLogger.log("HTTP_EMBED", "Error: ${e.message}")
             Result.failure(e)
         }
     }
@@ -114,12 +137,15 @@ class EmbedHttpExtractor(
         body: String,
         shortcode: String,
         urlKind: UrlKind,
+        sourceUrl: String = "https://www.instagram.com/p/$shortcode/",
         strategyConfig: StrategyDto
     ): List<MediaCandidate> {
         val seenUrls = LinkedHashSet<String>()
         val candidates = mutableListOf<MediaCandidate>()
 
-        // Collect all image/thumbnail URLs first so videos can attach a matching thumbnail
+        val caption = extractFirstGroup(ogDescPattern, body)?.let { decodeHtmlEntities(it) }
+        val creatorHandle = extractFirstGroup(usernameJsonPattern, body)
+
         val imageUrls = LinkedHashSet<String>()
         strategyConfig.imageRegex?.takeIf { it.isNotBlank() }?.let { regexStr ->
             extractMatches(Pattern.compile(regexStr), body, imageUrls)
@@ -129,7 +155,6 @@ class EmbedHttpExtractor(
         extractMatches(ogImagePattern, body, imageUrls)
         val imageList = imageUrls.toList()
 
-        // Collect video URLs from configured regex + modern Instagram JSON/HTML patterns
         val videoUrls = LinkedHashSet<String>()
         strategyConfig.videoRegex?.takeIf { it.isNotBlank() }?.let { regexStr ->
             extractMatches(Pattern.compile(regexStr), body, videoUrls)
@@ -142,7 +167,6 @@ class EmbedHttpExtractor(
             extractMatches(mp4DirectPattern, body, videoUrls)
         }
 
-        // Filter out non-media or static asset URLs
         val validVideos = videoUrls.filter { url ->
             !url.contains("static.cdninstagram.com/rsrc.php", ignoreCase = true)
         }
@@ -151,8 +175,6 @@ class EmbedHttpExtractor(
             body.contains("\"is_video\":true", ignoreCase = true) ||
             body.contains("EmbedIsVideo", ignoreCase = true)
 
-        // CRITICAL: Never return only a thumbnail image for a Reel or video post.
-        // Returning empty lets MediaExtractorChain fall back to EphemeralWebViewExtractor.
         if (isKnownVideoPost && validVideos.isEmpty()) {
             return emptyList()
         }
@@ -168,14 +190,15 @@ class EmbedHttpExtractor(
                         mediaType = MediaType.VIDEO,
                         downloadUrl = videoUrl,
                         thumbnailUrl = thumb,
-                        width = null,
-                        height = null
+                        caption = caption,
+                        creatorHandle = creatorHandle,
+                        platform = Platform.INSTAGRAM,
+                        sourceUrl = sourceUrl
                     )
                 )
             }
         }
 
-        // Include image slides only for non-Reel posts (or mixed carousels)
         if (urlKind != UrlKind.REEL) {
             val imagesToAdd = if (validVideos.isEmpty()) {
                 imageList
@@ -194,8 +217,10 @@ class EmbedHttpExtractor(
                             mediaType = MediaType.IMAGE,
                             downloadUrl = imageUrl,
                             thumbnailUrl = imageUrl,
-                            width = null,
-                            height = null
+                            caption = caption,
+                            creatorHandle = creatorHandle,
+                            platform = Platform.INSTAGRAM,
+                            sourceUrl = sourceUrl
                         )
                     )
                 }
@@ -203,6 +228,11 @@ class EmbedHttpExtractor(
         }
 
         return candidates
+    }
+
+    private fun extractFirstGroup(pattern: Pattern, body: String): String? {
+        val m = pattern.matcher(body)
+        return if (m.find()) m.group(1)?.trim()?.takeIf { it.isNotBlank() } else null
     }
 
     private fun extractMatches(pattern: Pattern, body: String, destination: MutableSet<String>) {
@@ -225,5 +255,14 @@ class EmbedHttpExtractor(
             .replace("&amp;", "&")
             .replace("\\&", "&")
             .trim()
+    }
+
+    private fun decodeHtmlEntities(text: String): String {
+        return text
+            .replace("&amp;", "&")
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
     }
 }

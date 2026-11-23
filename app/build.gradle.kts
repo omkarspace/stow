@@ -99,6 +99,7 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.coil.compose)
     implementation(libs.coil.video)
+    implementation(libs.androidx.biometric)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 
