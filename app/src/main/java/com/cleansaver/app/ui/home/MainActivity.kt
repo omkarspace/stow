@@ -161,8 +161,8 @@ class MainActivity : FragmentActivity() {
                 contract = ActivityResultContracts.RequestPermission()
             ) { }
 
-            LaunchedEffect(Unit) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            LaunchedEffect(settingsState.isLoaded, settingsState.fairUseAccepted) {
+                if (settingsState.isLoaded && settingsState.fairUseAccepted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     if (ContextCompat.checkSelfPermission(
                             this@MainActivity,
                             Manifest.permission.POST_NOTIFICATIONS
@@ -176,9 +176,7 @@ class MainActivity : FragmentActivity() {
             CleanSaverTheme(darkTheme = darkTheme) {
                 var selectedTab by rememberSaveable { mutableIntStateOf(0) }
                 var vaultUnlocked by remember { mutableStateOf(false) }
-                val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                 val snackbarHostState = remember { SnackbarHostState() }
-                val scope = rememberCoroutineScope()
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -246,12 +244,8 @@ class MainActivity : FragmentActivity() {
 
                     if (settingsState.isLoaded && !settingsState.fairUseAccepted) {
                         DisclaimerBottomSheet(
-                            sheetState = sheetState,
                             onAccept = {
-                                scope.launch {
-                                    sheetState.hide()
-                                    settingsViewModel.setFairUseAccepted(true)
-                                }
+                                settingsViewModel.setFairUseAccepted(true)
                             }
                         )
                     }
