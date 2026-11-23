@@ -6,7 +6,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -18,6 +17,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -27,13 +27,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentPaste
@@ -43,19 +50,18 @@ import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Tag
-import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -64,24 +70,31 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.cleansaver.app.data.local.DownloadedMediaEntity
 import com.cleansaver.app.domain.model.AppError
 import com.cleansaver.app.domain.model.DownloadProgress
 import com.cleansaver.app.domain.model.MediaCandidate
 import com.cleansaver.app.domain.model.MediaType
+import com.cleansaver.app.domain.usecase.ValidateUrlUseCase
 import com.cleansaver.app.ui.components.MediaPreviewDialog
 import com.cleansaver.app.ui.components.StowActionButton
 import com.cleansaver.app.ui.components.StowDarkBadge
 import com.cleansaver.app.ui.components.StowDarkBlock
+import com.cleansaver.app.ui.components.StowExtractionShimmerBlock
 import com.cleansaver.app.ui.components.StowLavenderBadge
 import com.cleansaver.app.ui.components.StowSegmentedProgressBar
 import com.cleansaver.app.ui.components.StowStatTile
@@ -95,21 +108,37 @@ import com.cleansaver.app.ui.theme.StowPineDark
 import com.cleansaver.app.ui.theme.StowPineElevated
 import com.cleansaver.app.ui.theme.StowPineMuted
 import com.cleansaver.app.ui.theme.SuccessGreenDark
+import kotlinx.coroutines.launch
 
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
-    libraryViewModel: LibraryViewModel
+    libraryViewModel: LibraryViewModel,
+    snackbarHostState: SnackbarHostState,
+    clipboardSuggestion: String? = null,
+    onUseClipboardSuggestion: (String) -> Unit = {},
+    onDismissClipboardSuggestion: () -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
     val libraryState by libraryViewModel.uiState.collectAsState()
     val context = LocalContext.current
-    var previewCandidate by remember { mutableStateOf<MediaCandidate?>(null) }
+    val haptics = LocalHapticFeedback.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val scope = rememberCoroutineScope()
+    val validator = remember { ValidateUrlUseCase() }
 
-    fun copyToClipboard(label: String, text: String) {
+    val detectedParsedUrl = remember(state.inputUrl) {
+        if (state.inputUrl.isBlank()) null else validator(state.inputUrl).getOrNull()
+    }
+
+    var previewCandidate by remember { mutableStateOf<MediaCandidate?>(null) }
+    var previewRecentItem by remember { mutableStateOf<DownloadedMediaEntity?>(null) }
+
+    fun copyWithSnackbar(label: String, text: String) {
+        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
         cm?.setPrimaryClip(ClipData.newPlainText(label, text))
-        Toast.makeText(context, "$label copied", Toast.LENGTH_SHORT).show()
+        scope.launch { snackbarHostState.showSnackbar("$label copied to clipboard") }
     }
 
     Column(
@@ -119,12 +148,62 @@ fun HomeScreen(
             .padding(horizontal = 14.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // 1. BRIK-style Top Brand Wordmark Block
+        // 1. Top Wordmark Block
         StowTopBarBlock(
             badgeText = if (libraryState.totalCount > 0) "${libraryState.totalCount} STOWED" else "ON-DEVICE"
         )
 
-        // 2. Hero Input Modular Dark Block
+        // 2. Smart Clipboard Detection Pill
+        AnimatedVisibility(
+            visible = !clipboardSuggestion.isNullOrBlank() && state.inputUrl.isBlank(),
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            clipboardSuggestion?.let { clipUrl ->
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onUseClipboardSuggestion(clipUrl)
+                        },
+                    shape = RoundedCornerShape(20.dp),
+                    color = StowLavender
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ContentPaste,
+                            contentDescription = null,
+                            tint = StowPineDark,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "LINK IN CLIPBOARD · TAP TO STOW",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = StowPineDark
+                            )
+                            Text(
+                                text = clipUrl,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = StowPineDark.copy(alpha = 0.75f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        IconButton(onClick = onDismissClipboardSuggestion, modifier = Modifier.size(28.dp)) {
+                            Icon(Icons.Default.Clear, contentDescription = "Dismiss", tint = StowPineDark, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Hero Input Modular Dark Block
         StowDarkBlock {
             Text(
                 text = "Stow any\npublic media.",
@@ -138,7 +217,7 @@ fun HomeScreen(
                 color = StowInkMutedOnDark
             )
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
                 value = state.inputUrl,
@@ -153,15 +232,11 @@ fun HomeScreen(
                 trailingIcon = {
                     if (state.inputUrl.isNotEmpty()) {
                         IconButton(onClick = { viewModel.onUrlChanged("") }) {
-                            Icon(
-                                imageVector = Icons.Default.Clear,
-                                contentDescription = "Clear",
-                                tint = StowInkMutedOnDark,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Icon(Icons.Default.Clear, contentDescription = "Clear", tint = StowInkMutedOnDark, modifier = Modifier.size(18.dp))
                         }
                     } else {
                         IconButton(onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
                             if (clipboard?.hasPrimaryClip() == true &&
                                 clipboard.primaryClipDescription?.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) == true
@@ -170,15 +245,17 @@ fun HomeScreen(
                                 viewModel.onPaste(text)
                             }
                         }) {
-                            Icon(
-                                imageVector = Icons.Default.ContentPaste,
-                                contentDescription = "Paste",
-                                tint = StowLavender,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Icon(Icons.Default.ContentPaste, contentDescription = "Paste", tint = StowLavender, modifier = Modifier.size(18.dp))
                         }
                     }
                 },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+                keyboardActions = KeyboardActions(
+                    onGo = {
+                        keyboard?.hide()
+                        viewModel.onExtract()
+                    }
+                ),
                 minLines = 1,
                 maxLines = 4,
                 modifier = Modifier.fillMaxWidth(),
@@ -193,13 +270,35 @@ fun HomeScreen(
                     unfocusedContainerColor = StowPineElevated
                 )
             )
+
+            // Live Platform Detection + Auto-Link Sanitizer ("Clean & Copy")
+            AnimatedVisibility(visible = detectedParsedUrl != null) {
+                detectedParsedUrl?.let { parsed ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        StowLavenderBadge(text = "${parsed.platform.displayName} DETECTED")
+                        TextButton(
+                            onClick = { copyWithSnackbar("Clean link", parsed.canonicalUrl) }
+                        ) {
+                            Icon(Icons.Default.CleaningServices, contentDescription = null, tint = StowLavender, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("CLEAN LINK", style = MaterialTheme.typography.labelSmall, color = StowInkOnDark)
+                        }
+                    }
+                }
+            }
         }
 
-        // 3. Light-Canvas Contrast Action Strip (matches BRIK "New challenge + [START]" band)
+        // 4. Light-Canvas Contrast Action Strip
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 10.dp),
+                .padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -210,7 +309,7 @@ fun HomeScreen(
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Spacer(modifier = Modifier.height(6.dp))
-                StowDarkBadge(text = if (state.isExtracting) "PARSING" else "ZERO ADS · LOCAL")
+                StowDarkBadge(text = if (state.isExtracting) "PARSING STREAM" else "ZERO ADS · LOCAL")
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = state.extractionStatus
@@ -224,51 +323,29 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            if (state.isValidating || state.isExtracting) {
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = StowPineDark,
-                    modifier = Modifier.height(48.dp)
-                ) {
-                    Box(
-                        modifier = Modifier.padding(horizontal = 24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = StowLavender,
-                            strokeWidth = 2.dp
-                        )
-                    }
-                }
-            } else {
-                StowActionButton(
-                    text = "Extract",
-                    onClick = { viewModel.onExtract() },
-                    enabled = state.inputUrl.isNotBlank()
-                )
-            }
+            StowActionButton(
+                text = if (state.isValidating || state.isExtracting) "Working..." else "Extract",
+                onClick = {
+                    keyboard?.hide()
+                    viewModel.onExtract()
+                },
+                enabled = state.inputUrl.isNotBlank() && !state.isValidating && !state.isExtracting
+            )
         }
 
-        // Action Banner
-        state.actionBannerMessage?.let { msg ->
-            StowDarkBlock {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = msg,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = StowLavender,
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(onClick = { viewModel.clearBanner() }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Clear, contentDescription = "Dismiss", tint = StowInkMutedOnDark, modifier = Modifier.size(16.dp))
-                    }
+        // Shimmer Skeleton while Extracting
+        AnimatedVisibility(
+            visible = state.isValidating || state.isExtracting,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            StowExtractionShimmerBlock(
+                stageLabel = when {
+                    state.isValidating -> "RESOLVING LINK"
+                    state.extractionStatus != null -> state.extractionStatus!!.uppercase()
+                    else -> "FETCHING STREAM"
                 }
-            }
+            )
         }
 
         // Error Block
@@ -280,25 +357,12 @@ fun HomeScreen(
             state.error?.let { err ->
                 StowDarkBlock {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.ErrorOutline,
-                            contentDescription = null,
-                            tint = ErrorRedDark,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = ErrorRedDark, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Unable to extract",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = StowInkOnDark
-                        )
+                        Text("Unable to extract", style = MaterialTheme.typography.titleMedium, color = StowInkOnDark)
                     }
                     Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = formatAppError(err),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = StowInkMutedOnDark
-                    )
+                    Text(formatAppError(err), style = MaterialTheme.typography.bodySmall, color = StowInkMutedOnDark)
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = { viewModel.onExtract() }) {
@@ -312,12 +376,14 @@ fun HomeScreen(
             }
         }
 
-        // 4. Extracted Media Modular Blocks
+        // 5. Swipeable Carousel (HorizontalPager) for Extracted Media
         AnimatedVisibility(
             visible = state.extractedCandidates.isNotEmpty(),
             enter = fadeIn() + expandVertically(),
             exit = fadeOut() + shrinkVertically()
         ) {
+            val pagerState = rememberPagerState(pageCount = { state.extractedCandidates.size })
+
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (state.extractedCandidates.size > 1) {
                     Row(
@@ -328,7 +394,7 @@ fun HomeScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "${state.selectedIndices.size} of ${state.extractedCandidates.size} selected",
+                            text = "Slide ${pagerState.currentPage + 1}/${state.extractedCandidates.size} · ${state.selectedIndices.size} selected",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onBackground
                         )
@@ -350,19 +416,16 @@ fun HomeScreen(
                     }
                 }
 
-                state.extractedCandidates.forEachIndexed { index, candidate ->
-                    val isSelected = state.selectedIndices.contains(index)
+                HorizontalPager(
+                    state = pagerState,
+                    pageSpacing = 10.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) { pageIndex ->
+                    val candidate = state.extractedCandidates[pageIndex]
+                    val isSelected = state.selectedIndices.contains(pageIndex)
                     val progress = state.downloadProgressMap[candidate.slideIndex]
 
-                    StowDarkBlock(
-                        modifier = Modifier.clickable {
-                            if (state.extractedCandidates.size > 1) {
-                                viewModel.toggleCandidateSelection(index)
-                            } else {
-                                previewCandidate = candidate
-                            }
-                        }
-                    ) {
+                    StowDarkBlock {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
@@ -370,7 +433,10 @@ fun HomeScreen(
                             if (state.extractedCandidates.size > 1) {
                                 Checkbox(
                                     checked = isSelected,
-                                    onCheckedChange = { viewModel.toggleCandidateSelection(index) },
+                                    onCheckedChange = {
+                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        viewModel.toggleCandidateSelection(pageIndex)
+                                    },
                                     colors = CheckboxDefaults.colors(
                                         checkedColor = StowLavender,
                                         checkmarkColor = StowPineDark,
@@ -437,7 +503,6 @@ fun HomeScreen(
                             }
                         }
 
-                        // Caption & Hashtag copy
                         candidate.caption?.takeIf { it.isNotBlank() }?.let { caption ->
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
@@ -452,13 +517,13 @@ fun HomeScreen(
                                 modifier = Modifier.padding(top = 4.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                TextButton(onClick = { copyToClipboard("Caption", caption) }) {
+                                TextButton(onClick = { copyWithSnackbar("Caption", caption) }) {
                                     Icon(Icons.Default.ContentCopy, contentDescription = null, tint = StowLavender, modifier = Modifier.size(14.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text("COPY CAPTION", style = MaterialTheme.typography.labelSmall, color = StowInkOnDark)
                                 }
                                 if (hashtags.isNotEmpty()) {
-                                    TextButton(onClick = { copyToClipboard("Hashtags", hashtags.joinToString(" ")) }) {
+                                    TextButton(onClick = { copyWithSnackbar("Hashtags", hashtags.joinToString(" ")) }) {
                                         Icon(Icons.Default.Tag, contentDescription = null, tint = StowLavender, modifier = Modifier.size(14.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text("TAGS (${hashtags.size})", style = MaterialTheme.typography.labelSmall, color = StowInkOnDark)
@@ -467,12 +532,15 @@ fun HomeScreen(
                             }
                         }
 
-                        // Audio & Cover extras for videos
                         if (candidate.mediaType == MediaType.VIDEO) {
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 OutlinedButton(
-                                    onClick = { viewModel.onDownloadAudio(candidate) },
+                                    onClick = {
+                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        viewModel.onDownloadAudio(candidate)
+                                        scope.launch { snackbarHostState.showSnackbar("Extracting audio (.m4a)...") }
+                                    },
                                     enabled = !state.isDownloading,
                                     shape = RoundedCornerShape(12.dp),
                                     border = BorderStroke(1.dp, StowPineMuted)
@@ -483,7 +551,11 @@ fun HomeScreen(
                                 }
                                 if (!candidate.thumbnailUrl.isNullOrBlank()) {
                                     OutlinedButton(
-                                        onClick = { viewModel.onDownloadCover(candidate) },
+                                        onClick = {
+                                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            viewModel.onDownloadCover(candidate)
+                                            scope.launch { snackbarHostState.showSnackbar("Saving cover image...") }
+                                        },
                                         enabled = !state.isDownloading,
                                         shape = RoundedCornerShape(12.dp),
                                         border = BorderStroke(1.dp, StowPineMuted)
@@ -496,7 +568,6 @@ fun HomeScreen(
                             }
                         }
 
-                        // Signature BRIK Segmented Download Progress Bar!
                         if (progress != null) {
                             Spacer(modifier = Modifier.height(14.dp))
                             when (progress) {
@@ -504,11 +575,7 @@ fun HomeScreen(
                                     Text("Queued...", style = MaterialTheme.typography.bodySmall, color = StowInkMutedOnDark)
                                 }
                                 is DownloadProgress.Running -> {
-                                    Text(
-                                        text = "Download progress",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = StowInkOnDark
-                                    )
+                                    Text("Download progress", style = MaterialTheme.typography.titleMedium, color = StowInkOnDark)
                                     Text(
                                         text = if (progress.totalBytes > 0) {
                                             "${formatBytes(progress.bytesRead)} of ${formatBytes(progress.totalBytes)}"
@@ -575,14 +642,31 @@ fun HomeScreen(
                                     }
                                 }
                                 is DownloadProgress.Failed -> {
-                                    Text(
-                                        text = formatAppError(progress.error),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = ErrorRedDark
-                                    )
+                                    Text(formatAppError(progress.error), style = MaterialTheme.typography.bodySmall, color = ErrorRedDark)
                                 }
                                 else -> {}
                             }
+                        }
+                    }
+                }
+
+                // Lavender Pager Dot Indicators
+                if (state.extractedCandidates.size > 1) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        repeat(state.extractedCandidates.size) { idx ->
+                            val active = pagerState.currentPage == idx
+                            Box(
+                                modifier = Modifier
+                                    .padding(horizontal = 3.dp)
+                                    .height(6.dp)
+                                    .width(if (active) 20.dp else 6.dp)
+                                    .clip(CircleShape)
+                                    .background(if (active) StowPineDark else StowPineMuted.copy(alpha = 0.35f))
+                            )
                         }
                     }
                 }
@@ -591,7 +675,7 @@ fun HomeScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -616,7 +700,71 @@ fun HomeScreen(
             }
         }
 
-        // 5. Bottom Paired Dark Bento Stat Tiles (matches BRIK "Best score" / "Reaction speed")
+        // 6. Recent Stows Horizontal Strip (keeps Home alive & 1-tap accessible)
+        if (state.extractedCandidates.isEmpty() && libraryState.items.isNotEmpty()) {
+            val recents = libraryState.items.take(6)
+            StowDarkBlock {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Recent stows", style = MaterialTheme.typography.titleMedium, color = StowInkOnDark)
+                    StowLavenderBadge(text = "${recents.size} LATEST")
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(end = 4.dp)
+                ) {
+                    items(recents, key = { it.id }) { item ->
+                        Box(
+                            modifier = Modifier
+                                .size(76.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(StowPineElevated)
+                                .clickable { previewRecentItem = item }
+                        ) {
+                            if (item.mediaType == "AUDIO") {
+                                Icon(
+                                    imageVector = Icons.Default.AudioFile,
+                                    contentDescription = item.fileName,
+                                    tint = StowLavender,
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .align(Alignment.Center)
+                                )
+                            } else {
+                                AsyncImage(
+                                    model = Uri.parse(item.mediaStoreUri),
+                                    contentDescription = item.fileName,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                                if (item.mediaType == "VIDEO") {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = StowPineDark.copy(alpha = 0.7f),
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .align(Alignment.Center)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.PlayArrow,
+                                            contentDescription = null,
+                                            tint = StowLavender,
+                                            modifier = Modifier.padding(4.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 7. Bottom Paired Dark Bento Stat Tiles
         if (state.extractedCandidates.isEmpty()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -646,6 +794,15 @@ fun HomeScreen(
             isVideo = candidate.mediaType == MediaType.VIDEO,
             title = if (candidate.mediaType == MediaType.VIDEO) "Video Preview" else "Photo Preview",
             onDismiss = { previewCandidate = null }
+        )
+    }
+
+    previewRecentItem?.let { item ->
+        MediaPreviewDialog(
+            mediaUriOrUrl = item.mediaStoreUri,
+            isVideo = item.mediaType == "VIDEO",
+            title = item.fileName,
+            onDismiss = { previewRecentItem = null }
         )
     }
 

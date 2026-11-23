@@ -1,12 +1,25 @@
 package com.cleansaver.app.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -15,12 +28,22 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -28,12 +51,9 @@ import com.cleansaver.app.ui.theme.StowInkMutedOnDark
 import com.cleansaver.app.ui.theme.StowInkOnDark
 import com.cleansaver.app.ui.theme.StowLavender
 import com.cleansaver.app.ui.theme.StowPineDark
+import com.cleansaver.app.ui.theme.StowPineElevated
 import com.cleansaver.app.ui.theme.StowPineMuted
 
-/**
- * Signature BRIK-inspired Top Wordmark Block:
- * Deep pine rounded block with "STOW®" on the left and a lavender pill badge on the right.
- */
 @Composable
 fun StowTopBarBlock(
     badgeText: String,
@@ -55,7 +75,7 @@ fun StowTopBarBlock(
                 text = "STOW®",
                 style = MaterialTheme.typography.headlineMedium.copy(
                     fontWeight = FontWeight.Light,
-                    letterSpacing = 1.2.sp
+                    letterSpacing = 1.4.sp
                 ),
                 color = StowInkOnDark
             )
@@ -64,9 +84,6 @@ fun StowTopBarBlock(
     }
 }
 
-/**
- * Deep pine modular rounded block (28dp radius) sitting on the light bone canvas.
- */
 @Composable
 fun StowDarkBlock(
     modifier: Modifier = Modifier,
@@ -84,9 +101,6 @@ fun StowDarkBlock(
     }
 }
 
-/**
- * Signature Lavender Pill Badge (#CFC7FA with deep pine uppercase text).
- */
 @Composable
 fun StowLavenderBadge(
     text: String,
@@ -106,9 +120,6 @@ fun StowLavenderBadge(
     }
 }
 
-/**
- * High-contrast dark pill badge for use on the light bone canvas (e.g. "7 PLATFORMS", "ZERO ADS").
- */
 @Composable
 fun StowDarkBadge(
     text: String,
@@ -129,8 +140,7 @@ fun StowDarkBadge(
 }
 
 /**
- * Signature BRIK-style vertical segmented progress bar:
- * Big crisp percentage numeral paired with vertical rounded lavender bars.
+ * Smooth spring-animated BRIK-style vertical segmented progress bar with tabular numerals.
  */
 @Composable
 fun StowSegmentedProgressBar(
@@ -139,14 +149,19 @@ fun StowSegmentedProgressBar(
     segmentCount: Int = 14
 ) {
     val clamped = percent.coerceIn(0, 100)
-    val filledCount = ((clamped / 100f) * segmentCount).toInt().coerceIn(0, segmentCount)
+    val animatedPercent by animateFloatAsState(
+        targetValue = clamped.toFloat(),
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "segmented_progress"
+    )
+    val filledCount = ((animatedPercent / 100f) * segmentCount).toInt().coerceIn(0, segmentCount)
 
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "$clamped%",
+            text = "${animatedPercent.toInt()}%",
             style = MaterialTheme.typography.displaySmall,
             color = StowInkOnDark
         )
@@ -157,12 +172,17 @@ fun StowSegmentedProgressBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             for (i in 0 until segmentCount) {
+                val segColor by animateColorAsState(
+                    targetValue = if (i < filledCount) StowLavender else StowPineMuted,
+                    animationSpec = tween(180),
+                    label = "seg_$i"
+                )
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .height(28.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(if (i < filledCount) StowLavender else StowPineMuted)
+                        .background(segColor)
                 )
             }
         }
@@ -170,8 +190,71 @@ fun StowSegmentedProgressBar(
 }
 
 /**
- * Paired dark bento stat tile (matches bottom "Best score" / "Reaction speed" cards).
+ * Shimmer skeleton block displayed while resolving/parsing a media link.
  */
+@Composable
+fun StowExtractionShimmerBlock(
+    stageLabel: String,
+    modifier: Modifier = Modifier
+) {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val shimmerX by transition.animateFloat(
+        initialValue = -300f,
+        targetValue = 900f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmerX"
+    )
+    val shimmerBrush = Brush.linearGradient(
+        colors = listOf(StowPineElevated, StowPineMuted, StowPineElevated),
+        start = Offset(shimmerX, 0f),
+        end = Offset(shimmerX + 260f, 180f)
+    )
+
+    StowDarkBlock(modifier = modifier) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            StowLavenderBadge(text = stageLabel)
+            Box(
+                modifier = Modifier
+                    .width(72.dp)
+                    .height(14.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(shimmerBrush)
+            )
+        }
+        Spacer(modifier = Modifier.height(14.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(18.dp))
+                .background(shimmerBrush)
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.75f)
+                .height(14.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(shimmerBrush)
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.45f)
+                .height(12.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(shimmerBrush)
+        )
+    }
+}
+
 @Composable
 fun StowStatTile(
     title: String,
@@ -194,7 +277,8 @@ fun StowStatTile(
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = StowInkMutedOnDark
+                color = StowInkMutedOnDark,
+                maxLines = 1
             )
             Spacer(modifier = Modifier.height(14.dp))
             Text(
@@ -207,7 +291,7 @@ fun StowStatTile(
 }
 
 /**
- * Crisp dark square-rounded CTA button (matches "START" button on the light canvas).
+ * Tactile spring-bounce CTA button with haptic tick.
  */
 @Composable
 fun StowActionButton(
@@ -216,10 +300,25 @@ fun StowActionButton(
     enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
+    val haptics = LocalHapticFeedback.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed && enabled) 0.95f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "btn_scale"
+    )
+
     Button(
-        onClick = onClick,
+        onClick = {
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onClick()
+        },
         enabled = enabled,
-        modifier = modifier.height(48.dp),
+        interactionSource = interactionSource,
+        modifier = modifier
+            .scale(scale)
+            .height(48.dp),
         shape = RoundedCornerShape(14.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = StowPineDark,
@@ -233,5 +332,49 @@ fun StowActionButton(
             text = text.uppercase(),
             style = MaterialTheme.typography.labelLarge
         )
+    }
+}
+
+/**
+ * Custom floating Stow pill snackbar with optional lavender Undo/Action button.
+ */
+@Composable
+fun StowFloatingSnackbarHost(
+    hostState: SnackbarHostState,
+    modifier: Modifier = Modifier
+) {
+    SnackbarHost(
+        hostState = hostState,
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+    ) { data ->
+        Surface(
+            shape = RoundedCornerShape(18.dp),
+            color = StowPineDark,
+            shadowElevation = 6.dp
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = data.visuals.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = StowInkOnDark,
+                    modifier = Modifier.weight(1f)
+                )
+                data.visuals.actionLabel?.let { label ->
+                    TextButton(onClick = { data.performAction() }) {
+                        Text(
+                            text = label.uppercase(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = StowLavender
+                        )
+                    }
+                }
+            }
+        }
     }
 }

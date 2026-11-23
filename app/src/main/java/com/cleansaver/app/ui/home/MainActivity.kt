@@ -17,8 +17,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +50,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -61,14 +67,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import com.cleansaver.app.CleanSaverApplication
 import com.cleansaver.app.ui.components.DisclaimerBottomSheet
 import com.cleansaver.app.ui.components.StowActionButton
 import com.cleansaver.app.ui.components.StowDarkBlock
+import com.cleansaver.app.ui.components.StowFloatingSnackbarHost
 import com.cleansaver.app.ui.library.LibraryScreen
 import com.cleansaver.app.ui.library.LibraryViewModel
 import com.cleansaver.app.ui.settings.SettingsScreen
@@ -78,6 +89,7 @@ import com.cleansaver.app.ui.theme.StowInkMutedOnDark
 import com.cleansaver.app.ui.theme.StowInkOnDark
 import com.cleansaver.app.ui.theme.StowLavender
 import com.cleansaver.app.ui.theme.StowPineDark
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
@@ -88,6 +100,7 @@ class MainActivity : FragmentActivity() {
 
     private var lastAutoPastedClip: String? = null
     private var pendingQuickPaste: Boolean = false
+    private val clipboardSuggestionFlow = MutableStateFlow<String?>(null)
 
     private val homeViewModel: HomeViewModel by viewModels {
         val app = application as CleanSaverApplication
@@ -106,16 +119,18 @@ class MainActivity : FragmentActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         pendingQuickPaste = intent?.getBooleanExtra(EXTRA_QUICK_PASTE, false) == true
 
         setContent {
             val settingsState by settingsViewModel.uiState.collectAsState()
+            val clipboardSuggestion by clipboardSuggestionFlow.collectAsState()
             val darkTheme = when (settingsState.themeMode) {
                 "LIGHT" -> false
                 "DARK" -> true
-                else -> false // Default to signature BRIK bone-white shell + deep pine blocks
+                else -> false
             }
 
             LaunchedEffect(darkTheme) {
@@ -135,7 +150,7 @@ class MainActivity : FragmentActivity() {
 
             val notificationPermissionLauncher = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.RequestPermission()
-            ) { /* Permission result handled gracefully */ }
+            ) { }
 
             LaunchedEffect(Unit) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -153,11 +168,13 @@ class MainActivity : FragmentActivity() {
                 var selectedTab by rememberSaveable { mutableIntStateOf(0) }
                 var vaultUnlocked by remember { mutableStateOf(false) }
                 val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                val snackbarHostState = remember { SnackbarHostState() }
                 val scope = rememberCoroutineScope()
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     containerColor = MaterialTheme.colorScheme.background,
+                    snackbarHost = { StowFloatingSnackbarHost(hostState = snackbarHostState) },
                     bottomBar = {
                         StowFloatingBottomBar(
                             selectedTab = selectedTab,
@@ -170,20 +187,49 @@ class MainActivity : FragmentActivity() {
                             .fillMaxSize()
                             .padding(innerPadding)
                     ) {
-                        when (selectedTab) {
-                            0 -> HomeScreen(viewModel = homeViewModel, libraryViewModel = libraryViewModel)
-                            1 -> {
-                                if (settingsState.vaultLockEnabled && !vaultUnlocked) {
-                                    VaultLockedView(
-                                        onUnlockClick = {
-                                            authenticateVault { vaultUnlocked = true }
-                                        }
-                                    )
-                                } else {
-                                    LibraryScreen(viewModel = libraryViewModel)
+                        AnimatedContent(
+                            targetState = selectedTab,
+                            transitionSpec = {
+                                fadeIn(animationSpec = tween(220)) togetherWith fadeOut(animationSpec = tween(150))
+                            },
+                            label = "tab_transition"
+                        ) { tab ->
+                            when (tab) {
+                                0 -> HomeScreen(
+                                    viewModel = homeViewModel,
+                                    libraryViewModel = libraryViewModel,
+                                    snackbarHostState = snackbarHostState,
+                                    clipboardSuggestion = clipboardSuggestion,
+                                    onUseClipboardSuggestion = { url ->
+                                        clipboardSuggestionFlow.value = null
+                                        lastAutoPastedClip = url
+                                        homeViewModel.onPaste(url)
+                                    },
+                                    onDismissClipboardSuggestion = {
+                                        lastAutoPastedClip = clipboardSuggestion
+                                        clipboardSuggestionFlow.value = null
+                                    }
+                                )
+                                1 -> {
+                                    if (settingsState.vaultLockEnabled && !vaultUnlocked) {
+                                        VaultLockedView(
+                                            onUnlockClick = {
+                                                authenticateVault { vaultUnlocked = true }
+                                            }
+                                        )
+                                    } else {
+                                        LibraryScreen(
+                                            viewModel = libraryViewModel,
+                                            snackbarHostState = snackbarHostState
+                                        )
+                                    }
                                 }
+                                2 -> SettingsScreen(
+                                    viewModel = settingsViewModel,
+                                    libraryViewModel = libraryViewModel,
+                                    snackbarHostState = snackbarHostState
+                                )
                             }
-                            2 -> SettingsScreen(viewModel = settingsViewModel)
                         }
                     }
 
@@ -213,7 +259,7 @@ class MainActivity : FragmentActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) {
-            checkClipboardAutoDetect(forceFromTile = pendingQuickPaste)
+            inspectClipboard(forceFromTile = pendingQuickPaste)
             pendingQuickPaste = false
         }
     }
@@ -246,32 +292,37 @@ class MainActivity : FragmentActivity() {
         prompt.authenticate(promptInfo)
     }
 
-    private fun checkClipboardAutoDetect(forceFromTile: Boolean) {
-        val settings = settingsViewModel.uiState.value
-        if (!forceFromTile && !settings.clipboardAutoDetect) return
-
+    private fun inspectClipboard(forceFromTile: Boolean) {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-        if (clipboard?.hasPrimaryClip() == true &&
-            clipboard.primaryClipDescription?.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) == true
+        if (clipboard?.hasPrimaryClip() != true ||
+            clipboard.primaryClipDescription?.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) != true
         ) {
-            val text = clipboard.primaryClip?.getItemAt(0)?.text?.toString()?.trim() ?: ""
-            val isSupportedLink = text.contains("instagram.com/", ignoreCase = true) ||
-                text.contains("instagr.am/", ignoreCase = true) ||
-                text.contains("threads.net/", ignoreCase = true) ||
-                text.contains("threads.com/", ignoreCase = true) ||
-                text.contains("x.com/", ignoreCase = true) ||
-                text.contains("twitter.com/", ignoreCase = true) ||
-                text.contains("reddit.com/", ignoreCase = true) ||
-                text.contains("pinterest.", ignoreCase = true) ||
-                text.contains("pin.it/", ignoreCase = true) ||
-                text.contains("tiktok.com/", ignoreCase = true) ||
-                text.contains("youtube.com/shorts/", ignoreCase = true) ||
-                text.contains("youtu.be/", ignoreCase = true)
+            return
+        }
 
-            if (isSupportedLink && (forceFromTile || text != lastAutoPastedClip)) {
-                lastAutoPastedClip = text
-                homeViewModel.onPaste(text)
-            }
+        val text = clipboard.primaryClip?.getItemAt(0)?.text?.toString()?.trim() ?: ""
+        val isSupportedLink = text.contains("instagram.com/", ignoreCase = true) ||
+            text.contains("instagr.am/", ignoreCase = true) ||
+            text.contains("threads.net/", ignoreCase = true) ||
+            text.contains("threads.com/", ignoreCase = true) ||
+            text.contains("x.com/", ignoreCase = true) ||
+            text.contains("twitter.com/", ignoreCase = true) ||
+            text.contains("reddit.com/", ignoreCase = true) ||
+            text.contains("pinterest.", ignoreCase = true) ||
+            text.contains("pin.it/", ignoreCase = true) ||
+            text.contains("tiktok.com/", ignoreCase = true) ||
+            text.contains("youtube.com/shorts/", ignoreCase = true) ||
+            text.contains("youtu.be/", ignoreCase = true)
+
+        if (!isSupportedLink) return
+
+        val settings = settingsViewModel.uiState.value
+        if (forceFromTile || (settings.clipboardAutoDetect && text != lastAutoPastedClip)) {
+            lastAutoPastedClip = text
+            clipboardSuggestionFlow.value = null
+            homeViewModel.onPaste(text)
+        } else if (text != lastAutoPastedClip) {
+            clipboardSuggestionFlow.value = text
         }
     }
 }
@@ -281,6 +332,7 @@ private fun StowFloatingBottomBar(
     selectedTab: Int,
     onSelectTab: (Int) -> Unit
 ) {
+    val haptics = LocalHapticFeedback.current
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -303,21 +355,30 @@ private fun StowFloatingBottomBar(
                     label = "STOW",
                     icon = if (selectedTab == 0) Icons.Filled.Download else Icons.Outlined.Download,
                     selected = selectedTab == 0,
-                    onClick = { onSelectTab(0) },
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onSelectTab(0)
+                    },
                     modifier = Modifier.weight(1f)
                 )
                 StowNavItem(
                     label = "LIBRARY",
                     icon = if (selectedTab == 1) Icons.Filled.PhotoLibrary else Icons.Outlined.PhotoLibrary,
                     selected = selectedTab == 1,
-                    onClick = { onSelectTab(1) },
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onSelectTab(1)
+                    },
                     modifier = Modifier.weight(1f)
                 )
                 StowNavItem(
                     label = "SETTINGS",
                     icon = if (selectedTab == 2) Icons.Filled.Settings else Icons.Outlined.Settings,
                     selected = selectedTab == 2,
-                    onClick = { onSelectTab(2) },
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onSelectTab(2)
+                    },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -333,13 +394,18 @@ private fun StowNavItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val bgColor by animateColorAsState(
+        targetValue = if (selected) StowLavender else Color.Transparent,
+        animationSpec = tween(200),
+        label = "nav_bg"
+    )
     Surface(
         modifier = modifier
             .padding(horizontal = 4.dp)
             .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
-        color = if (selected) StowLavender else androidx.compose.ui.graphics.Color.Transparent
+        color = bgColor
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -386,11 +452,7 @@ private fun VaultLockedView(onUnlockClick: () -> Unit) {
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Vault locked.",
-                style = MaterialTheme.typography.headlineLarge,
-                color = StowInkOnDark
-            )
+            Text("Vault locked.", style = MaterialTheme.typography.headlineLarge, color = StowInkOnDark)
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = "Verify your identity to access your saved media.",

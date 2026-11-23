@@ -3,6 +3,13 @@
     <style name="Theme.CleanSaver" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:statusBarColor">@color/transparent</item>
         <item name="android:navigationBarColor">@color/transparent</item>
+        <item name="android:windowBackground">#FF071E1F</item>
+    </style>
+
+    <style name="Theme.Stow.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#FF071E1F</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.CleanSaver</item>
     </style>
 
     <style name="Theme.CleanSaver.Transparent" parent="android:Theme.Material.Light.NoActionBar">
@@ -13,4 +20,3 @@
         <item name="android:navigationBarColor">@color/transparent</item>
     </style>
 </resources>
-

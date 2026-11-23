@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.AlertDialog
@@ -33,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -42,6 +44,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +52,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.cleansaver.app.ui.components.StowDarkBlock
 import com.cleansaver.app.ui.components.StowTopBarBlock
+import com.cleansaver.app.ui.library.LibraryViewModel
 import com.cleansaver.app.ui.theme.ErrorRedDark
 import com.cleansaver.app.ui.theme.StowInkMutedOnDark
 import com.cleansaver.app.ui.theme.StowInkOnDark
@@ -57,11 +61,19 @@ import com.cleansaver.app.ui.theme.StowPineDark
 import com.cleansaver.app.ui.theme.StowPineElevated
 import com.cleansaver.app.ui.theme.StowPineMuted
 import com.cleansaver.app.ui.theme.SuccessGreenDark
+import com.cleansaver.app.util.LibraryBackupManager
+import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel) {
+fun SettingsScreen(
+    viewModel: SettingsViewModel,
+    libraryViewModel: LibraryViewModel,
+    snackbarHostState: SnackbarHostState
+) {
     val state by viewModel.uiState.collectAsState()
+    val libraryState by libraryViewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var showClearConfirm by remember { mutableStateOf(false) }
     var showDiagnostics by remember { mutableStateOf(false) }
     var albumDraft by remember(state.customAlbumName) { mutableStateOf(state.customAlbumName) }
@@ -316,6 +328,30 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     Icon(Icons.Default.BugReport, contentDescription = null, tint = StowLavender, modifier = Modifier.size(15.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("VIEW", color = StowLavender, style = MaterialTheme.typography.labelSmall)
+                }
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = StowPineMuted)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Export library backup", style = MaterialTheme.typography.titleMedium, color = StowInkOnDark)
+                    Text("Share favorites, tags & metadata as JSON", style = MaterialTheme.typography.bodySmall, color = StowInkMutedOnDark)
+                }
+                TextButton(onClick = {
+                    if (libraryState.items.isEmpty()) {
+                        scope.launch { snackbarHostState.showSnackbar("Library is empty") }
+                    } else {
+                        LibraryBackupManager.shareBackupJson(context, libraryState.items)
+                    }
+                }) {
+                    Icon(Icons.Default.FileDownload, contentDescription = null, tint = StowLavender, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("EXPORT", color = StowLavender, style = MaterialTheme.typography.labelSmall)
                 }
             }
 

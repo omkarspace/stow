@@ -11,10 +11,12 @@ import com.cleansaver.app.domain.model.AppError
 import com.cleansaver.app.domain.model.CustomThrowable
 import com.cleansaver.app.domain.model.DownloadProgress
 import com.cleansaver.app.domain.model.MediaCandidate
+import com.cleansaver.app.domain.model.MediaType
 import com.cleansaver.app.domain.model.ParsedUrl
 import com.cleansaver.app.domain.repository.MediaRepository
 import com.cleansaver.app.domain.repository.UserPrefsRepository
 import com.cleansaver.app.domain.usecase.ValidateUrlUseCase
+import com.cleansaver.app.util.NotificationHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -100,6 +102,7 @@ class MediaRepositoryImpl(
                 val result = mediaStoreWriter.downloadToGallery(candidate, saveOptions) { bytesRead, totalBytes, percent ->
                     currentMap[key] = DownloadProgress.Running(bytesRead, totalBytes, percent)
                     progressState.value = currentMap.toMap()
+                    NotificationHelper.notifyProgress(context, candidate.shortcode, percent)
                 }
 
                 if (result.isSuccess) {
@@ -119,8 +122,15 @@ class MediaRepositoryImpl(
                             platform = candidate.platform.name
                         )
                     )
+                    val mime = when (candidate.mediaType) {
+                        MediaType.VIDEO -> "video/*"
+                        MediaType.AUDIO -> "audio/*"
+                        MediaType.IMAGE -> "image/*"
+                    }
+                    NotificationHelper.notifyCompleted(context, meta.fileName, meta.mediaStoreUri, mime)
                     currentMap[key] = DownloadProgress.Completed(meta.mediaStoreUri, meta.fileName)
                 } else {
+                    NotificationHelper.cancelProgress(context)
                     val appError = (result.exceptionOrNull() as? CustomThrowable)?.appError
                         ?: AppError.StorageError(result.exceptionOrNull()?.message ?: "Unknown download error")
                     currentMap[key] = DownloadProgress.Failed(appError)
