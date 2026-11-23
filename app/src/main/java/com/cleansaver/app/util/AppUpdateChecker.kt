@@ -20,7 +20,7 @@ class AppUpdateChecker(
 ) {
     companion object {
         private const val LATEST_RELEASE_API =
-            "https://api.github.com/repos/omkarspace/cleansaver/releases/latest"
+            "https://api.github.com/repos/omkarspace/stow/releases/latest"
 
         fun isNewerVersion(latestTag: String, currentVersion: String): Boolean {
             val latest = latestTag.trimStart('v', 'V').split(".").map { it.toIntOrNull() ?: 0 }
@@ -47,7 +47,7 @@ class AppUpdateChecker(
             okHttpClient.newCall(request).execute().use { response ->
                 if (response.code == 404) {
                     return@withContext Result.success(
-                        ReleaseUpdateInfo(currentVersion, "https://github.com/omkarspace/cleansaver/releases", false)
+                        ReleaseUpdateInfo(currentVersion, "https://github.com/omkarspace/stow/releases", false)
                     )
                 }
                 if (!response.isSuccessful) {
@@ -57,7 +57,7 @@ class AppUpdateChecker(
                 val obj = json.parseToJsonElement(body).jsonObject
                 val tag = obj["tag_name"]?.jsonPrimitive?.content ?: currentVersion
                 val url = obj["html_url"]?.jsonPrimitive?.content
-                    ?: "https://github.com/omkarspace/cleansaver/releases"
+                    ?: "https://github.com/omkarspace/stow/releases"
                 Result.success(
                     ReleaseUpdateInfo(
                         latestVersion = tag.trimStart('v', 'V'),
