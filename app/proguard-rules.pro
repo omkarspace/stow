@@ -56,8 +56,12 @@
     <init>(...);
 }
 
-# youtubedl-android / yt-dlp / FFmpeg / Aria2c
+# youtubedl-android / yt-dlp / FFmpeg / Aria2c / Jackson / Apache Commons
 -keep class com.yausername.** { *; }
 -dontwarn com.yausername.**
+-keep class com.fasterxml.jackson.** { *; }
+-dontwarn com.fasterxml.jackson.**
+-keep class org.apache.commons.** { *; }
+-dontwarn org.apache.commons.**
 
 

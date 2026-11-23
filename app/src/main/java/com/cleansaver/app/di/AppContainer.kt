@@ -28,6 +28,8 @@ import com.cleansaver.app.domain.usecase.ExtractMediaUseCase
 import com.cleansaver.app.domain.usecase.RefreshConfigUseCase
 import com.cleansaver.app.domain.usecase.ValidateUrlUseCase
 import com.cleansaver.app.util.AppUpdateChecker
+import com.cleansaver.app.util.ExtractionLogger
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -40,7 +42,10 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 class AppContainer(private val context: Context) {
 
     val applicationScope: CoroutineScope by lazy {
-        CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val handler = CoroutineExceptionHandler { _, throwable ->
+            ExtractionLogger.log("APP", "Background error: ${throwable.javaClass.simpleName}: ${throwable.message}")
+        }
+        CoroutineScope(SupervisorJob() + Dispatchers.IO + handler)
     }
 
     val appVersionName: String by lazy {

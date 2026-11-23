@@ -22,15 +22,26 @@ class CleanSaverApplication : Application(), Configuration.Provider, ImageLoader
         super.onCreate()
         container = AppContainer(this)
 
-        // Initialize universal client-side yt-dlp + FFmpeg + Aria2c engine asynchronously
+        // Initialize universal client-side yt-dlp + FFmpeg + Aria2c engine asynchronously.
+        // Catch Throwable (including UnsatisfiedLinkError / NoClassDefFoundError) so init can never crash launch.
         container.applicationScope.launch(Dispatchers.IO) {
             try {
                 YoutubeDL.getInstance().init(this@CleanSaverApplication)
+                ExtractionLogger.log("YT-DLP", "YoutubeDL initialized")
+            } catch (t: Throwable) {
+                ExtractionLogger.log("YT-DLP", "YoutubeDL init error: ${t.javaClass.simpleName}: ${t.message}")
+            }
+            try {
                 FFmpeg.getInstance().init(this@CleanSaverApplication)
+                ExtractionLogger.log("YT-DLP", "FFmpeg initialized")
+            } catch (t: Throwable) {
+                ExtractionLogger.log("YT-DLP", "FFmpeg init error: ${t.javaClass.simpleName}: ${t.message}")
+            }
+            try {
                 Aria2c.getInstance().init(this@CleanSaverApplication)
-                ExtractionLogger.log("YT-DLP", "Engine initialized (yt-dlp + ffmpeg + aria2c)")
-            } catch (e: Exception) {
-                ExtractionLogger.log("YT-DLP", "Init warning: ${e.message}")
+                ExtractionLogger.log("YT-DLP", "Aria2c initialized")
+            } catch (t: Throwable) {
+                ExtractionLogger.log("YT-DLP", "Aria2c init error: ${t.javaClass.simpleName}: ${t.message}")
             }
         }
     }
