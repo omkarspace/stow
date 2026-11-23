@@ -1,0 +1,40 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Monochrome Micro-Reel Cartridge for Android 13+ Material You Themed Icons -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="4.4"
+        android:pathData="M37,35 L71,35 C76.52,35 81,39.48 81,45 L81,63 C81,68.52 76.52,73 71,73 L37,73 C31.48,73 27,68.52 27,63 L27,45 C27,39.48 31.48,35 37,35 Z" />
+
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.8"
+        android:strokeLineCap="round"
+        android:pathData="M43,59.2 L65,59.2" />
+
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3.8"
+        android:pathData="M43,44.8 A7.2,7.2 0 1,1 42.99,44.8 Z" />
+
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3.8"
+        android:pathData="M65,44.8 A7.2,7.2 0 1,1 64.99,44.8 Z" />
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M43,49.8 A2.2,2.2 0 1,1 42.99,49.8 Z" />
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M65,49.8 A2.2,2.2 0 1,1 64.99,49.8 Z" />
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M41.2,67 L66.8,67 C68.57,67 70,68.43 70,70.2 L70,70.3 C70,72.07 68.57,73.5 66.8,73.5 L41.2,73.5 C39.43,73.5 38,72.07 38,70.3 L38,70.2 C38,68.43 39.43,67 41.2,67 Z" />
+</vector>

@@ -3,17 +3,46 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Minimalist Stow Tray & Downward Arrow -->
+
+    <!-- Micro-Reel Cartridge Body (centered inside 66x66 adaptive safe zone) -->
     <path
-        android:pathData="M54,30L54,58M43,48L54,59L65,48"
-        android:strokeColor="#FFFAFAFA"
-        android:strokeWidth="5"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
+        android:fillColor="#FF0F2E30"
+        android:strokeColor="#FFF5F4F0"
+        android:strokeWidth="4.4"
+        android:pathData="M37,35 L71,35 C76.52,35 81,39.48 81,45 L81,63 C81,68.52 76.52,73 71,73 L37,73 C31.48,73 27,68.52 27,63 L27,45 C27,39.48 31.48,35 37,35 Z" />
+
+    <!-- Tape Bridge Line -->
     <path
-        android:pathData="M34,58L34,70C34,72.2 35.8,74 38,74L70,74C72.2,74 74,72.2 74,70L74,58"
-        android:strokeColor="#FFFAFAFA"
-        android:strokeWidth="5"
+        android:strokeColor="#FFD4CDFF"
+        android:strokeAlpha="0.7"
+        android:strokeWidth="2.8"
         android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
+        android:pathData="M43,59.2 L65,59.2" />
+
+    <!-- Left Spool Ring -->
+    <path
+        android:strokeColor="#FFD4CDFF"
+        android:strokeWidth="3.8"
+        android:pathData="M43,44.8 A7.2,7.2 0 1,1 42.99,44.8 Z" />
+
+    <!-- Right Spool Ring -->
+    <path
+        android:strokeColor="#FFD4CDFF"
+        android:strokeWidth="3.8"
+        android:pathData="M65,44.8 A7.2,7.2 0 1,1 64.99,44.8 Z" />
+
+    <!-- Left Spool Center Hub -->
+    <path
+        android:fillColor="#FFF5F4F0"
+        android:pathData="M43,49.8 A2.2,2.2 0 1,1 42.99,49.8 Z" />
+
+    <!-- Right Spool Center Hub -->
+    <path
+        android:fillColor="#FFF5F4F0"
+        android:pathData="M65,49.8 A2.2,2.2 0 1,1 64.99,49.8 Z" />
+
+    <!-- Bottom Lavender Tape Trap Pill -->
+    <path
+        android:fillColor="#FFD4CDFF"
+        android:pathData="M41.2,67 L66.8,67 C68.57,67 70,68.43 70,70.2 L70,70.3 C70,72.07 68.57,73.5 66.8,73.5 L41.2,73.5 C39.43,73.5 38,72.07 38,70.3 L38,70.2 C38,68.43 39.43,67 41.2,67 Z" />
 </vector>

@@ -135,3 +135,4 @@ class DownloadQueueManager(
         _tasks.update { list -> list.map { if (it.id == taskId) transform(it) else it } }
     }
 }
+
