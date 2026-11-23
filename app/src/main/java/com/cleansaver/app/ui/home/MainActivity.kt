@@ -306,7 +306,10 @@ class MainActivity : FragmentActivity() {
                 text.contains("twitter.com/", ignoreCase = true) ||
                 text.contains("reddit.com/", ignoreCase = true) ||
                 text.contains("pinterest.", ignoreCase = true) ||
-                text.contains("pin.it/", ignoreCase = true)
+                text.contains("pin.it/", ignoreCase = true) ||
+                text.contains("tiktok.com/", ignoreCase = true) ||
+                text.contains("youtube.com/shorts/", ignoreCase = true) ||
+                text.contains("youtu.be/", ignoreCase = true)
 
             if (isSupportedLink && (forceFromTile || text != lastAutoPastedClip)) {
                 lastAutoPastedClip = text

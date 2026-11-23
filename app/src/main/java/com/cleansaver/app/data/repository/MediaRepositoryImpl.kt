@@ -39,13 +39,16 @@ class MediaRepositoryImpl(
 
     override suspend fun extractMedia(parsedUrl: ParsedUrl): Result<List<MediaCandidate>> {
         val resolvedUrl = if (parsedUrl.rawUrl.contains("/share/", ignoreCase = true) ||
-            parsedUrl.rawUrl.contains("pin.it/", ignoreCase = true)
+            parsedUrl.rawUrl.contains("pin.it/", ignoreCase = true) ||
+            parsedUrl.rawUrl.contains("vm.tiktok.com/", ignoreCase = true) ||
+            parsedUrl.rawUrl.contains("vt.tiktok.com/", ignoreCase = true)
         ) {
             resolveRedirect(parsedUrl)
         } else {
             parsedUrl
         }
-        return extractorChain.extract(resolvedUrl)
+        val preferDataSaver = userPrefsRepository.qualityPreference.first() == "DATA_SAVER"
+        return extractorChain.extract(resolvedUrl, preferDataSaver = preferDataSaver)
     }
 
     private suspend fun resolveRedirect(parsedUrl: ParsedUrl): ParsedUrl = withContext(Dispatchers.IO) {

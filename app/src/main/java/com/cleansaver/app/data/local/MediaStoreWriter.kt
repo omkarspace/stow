@@ -80,6 +80,10 @@ class MediaStoreWriter(
             return@withContext downloadAndExtractAudio(candidate, options, onProgress)
         }
 
+        if (candidate.mediaType == MediaType.VIDEO && !candidate.audioUrl.isNullOrBlank()) {
+            return@withContext downloadAndMuxDashVideo(candidate, options, onProgress)
+        }
+
         val isVideo = candidate.mediaType == MediaType.VIDEO
         val collection: Uri = if (isVideo) {
             MediaStore.Video.Media.EXTERNAL_CONTENT_URI
@@ -252,6 +256,111 @@ class MediaStoreWriter(
         } finally {
             try { tempMp4.delete() } catch (_: Exception) {}
             try { tempM4a.delete() } catch (_: Exception) {}
+        }
+    }
+
+    private fun downloadAndMuxDashVideo(
+        candidate: MediaCandidate,
+        options: SaveOptions,
+        onProgress: (bytesRead: Long, totalBytes: Long, percent: Int) -> Unit
+    ): Result<SavedFileMeta> {
+        val ts = System.currentTimeMillis()
+        val tempVideo = File(context.cacheDir, "cs_vid_$ts.mp4")
+        val tempAudio = File(context.cacheDir, "cs_aud_$ts.mp4")
+        val tempMuxed = File(context.cacheDir, "cs_mux_$ts.mp4")
+        val contentResolver = context.contentResolver
+        var pendingUri: Uri? = null
+
+        return try {
+            // 1. Download video stream (0..75%)
+            val vidReq = Request.Builder().url(candidate.downloadUrl).header("User-Agent", CDN_USER_AGENT).build()
+            okHttpClient.newCall(vidReq).execute().use { response ->
+                if (!response.isSuccessful) throw IllegalStateException("Video HTTP ${response.code}")
+                val body = response.body ?: throw IllegalStateException("Empty video body")
+                val total = body.contentLength()
+                val buf = ByteArray(16384)
+                var readTotal = 0L
+                var lastPct = -1
+                body.byteStream().use { input ->
+                    FileOutputStream(tempVideo).use { out ->
+                        var r: Int
+                        while (input.read(buf).also { r = it } != -1) {
+                            out.write(buf, 0, r)
+                            readTotal += r
+                            if (total > 0) {
+                                val pct = ((readTotal * 75) / total).toInt().coerceIn(0, 75)
+                                if (pct != lastPct) {
+                                    lastPct = pct
+                                    onProgress(readTotal, total, pct)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. Download companion audio stream (best-effort; some Reddit videos are silent)
+            var hasAudio = false
+            val audioUrls = listOfNotNull(
+                candidate.audioUrl,
+                candidate.audioUrl?.replace("DASH_AUDIO_128.mp4", "DASH_audio.mp4")
+            ).distinct()
+            for (aUrl in audioUrls) {
+                try {
+                    val audReq = Request.Builder().url(aUrl).header("User-Agent", CDN_USER_AGENT).build()
+                    okHttpClient.newCall(audReq).execute().use { resp ->
+                        if (resp.isSuccessful && resp.body != null) {
+                            resp.body!!.byteStream().use { input ->
+                                FileOutputStream(tempAudio).use { out -> input.copyTo(out) }
+                            }
+                            if (tempAudio.length() > 0) hasAudio = true
+                        }
+                    }
+                    if (hasAudio) break
+                } catch (_: Exception) {}
+            }
+            onProgress(tempVideo.length(), tempVideo.length(), 88)
+
+            // 3. Mux video + audio via native MediaMuxer, or fall back to video-only
+            val finalFile = if (hasAudio && AudioTrackExtractor.muxVideoAndAudio(tempVideo, tempAudio, tempMuxed)) {
+                tempMuxed
+            } else {
+                tempVideo
+            }
+
+            val album = options.albumName.ifBlank { "CleanSaver" }
+            val fileName = buildFileName(candidate, options.fileNamingPattern)
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
+                put(MediaStore.MediaColumns.RELATIVE_PATH, "Movies/$album")
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
+            }
+            pendingUri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+                ?: throw IllegalStateException("Failed to create MediaStore video entry")
+
+            FileInputStream(finalFile).use { input ->
+                contentResolver.openOutputStream(pendingUri!!)?.use { out ->
+                    input.copyTo(out)
+                } ?: throw IllegalStateException("Failed to open video output stream")
+            }
+
+            contentResolver.update(
+                pendingUri!!,
+                ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) },
+                null,
+                null
+            )
+            onProgress(finalFile.length(), finalFile.length(), 100)
+            Result.success(SavedFileMeta(pendingUri.toString(), fileName, finalFile.length()))
+        } catch (e: Throwable) {
+            pendingUri?.let { try { contentResolver.delete(it, null, null) } catch (_: Exception) {} }
+            if (e is CancellationException) throw e
+            Result.failure(e)
+        } finally {
+            try { tempVideo.delete() } catch (_: Exception) {}
+            try { tempAudio.delete() } catch (_: Exception) {}
+            try { tempMuxed.delete() } catch (_: Exception) {}
         }
     }
 }

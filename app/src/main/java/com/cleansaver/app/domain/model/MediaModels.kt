@@ -19,7 +19,9 @@ enum class Platform(val displayName: String) {
     THREADS("Threads"),
     X_TWITTER("X"),
     REDDIT("Reddit"),
-    PINTEREST("Pinterest")
+    PINTEREST("Pinterest"),
+    TIKTOK("TikTok"),
+    YOUTUBE_SHORTS("YouTube")
 }
 
 @Keep
@@ -40,6 +42,7 @@ data class MediaCandidate(
     val mediaType: MediaType,
     val downloadUrl: String,
     val thumbnailUrl: String? = null,
+    val audioUrl: String? = null,
     val width: Int? = null,
     val height: Int? = null,
     val caption: String? = null,

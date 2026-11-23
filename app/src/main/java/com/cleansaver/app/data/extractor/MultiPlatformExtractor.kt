@@ -16,6 +16,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
+import java.net.URLEncoder
 import java.net.UnknownHostException
 import java.util.regex.Pattern
 
@@ -39,26 +40,32 @@ class MultiPlatformExtractor(
         Pattern.CASE_INSENSITIVE
     )
     private val mp4Pattern = Pattern.compile("""(https?:(?:\\/|/){2}[^"'\s\\<>]+?\.mp4[^"'\s\\<>]*)""")
+    private val ytStreamUrlPattern = Pattern.compile(
+        """"url"\s*:\s*"(https://[^"]*googlevideo\.com/videoplayback[^"]*mime=video%2Fmp4[^"]*)""""
+    )
 
-    suspend fun extract(parsedUrl: ParsedUrl): Result<List<MediaCandidate>> = withContext(Dispatchers.IO) {
-        ExtractionLogger.log("MULTI", "Extracting ${parsedUrl.platform.displayName}: ${parsedUrl.canonicalUrl}")
-        try {
-            when (parsedUrl.platform) {
-                Platform.X_TWITTER -> extractXTwitter(parsedUrl)
-                Platform.REDDIT -> extractReddit(parsedUrl)
-                Platform.THREADS -> extractGenericMetaHtml(parsedUrl)
-                Platform.PINTEREST -> extractGenericMetaHtml(parsedUrl)
-                Platform.INSTAGRAM -> Result.failure(CustomThrowable(AppError.ParserOutdated))
+    suspend fun extract(parsedUrl: ParsedUrl, preferDataSaver: Boolean = false): Result<List<MediaCandidate>> =
+        withContext(Dispatchers.IO) {
+            ExtractionLogger.log("MULTI", "Extracting ${parsedUrl.platform.displayName} (dataSaver=$preferDataSaver)")
+            try {
+                when (parsedUrl.platform) {
+                    Platform.X_TWITTER -> extractXTwitter(parsedUrl)
+                    Platform.REDDIT -> extractReddit(parsedUrl)
+                    Platform.THREADS -> extractGenericMetaHtml(parsedUrl)
+                    Platform.PINTEREST -> extractGenericMetaHtml(parsedUrl)
+                    Platform.TIKTOK -> extractTikTok(parsedUrl, preferDataSaver)
+                    Platform.YOUTUBE_SHORTS -> extractYouTubeShorts(parsedUrl, preferDataSaver)
+                    Platform.INSTAGRAM -> Result.failure(CustomThrowable(AppError.ParserOutdated))
+                }
+            } catch (e: UnknownHostException) {
+                Result.failure(CustomThrowable(AppError.NoInternet))
+            } catch (e: IOException) {
+                Result.failure(CustomThrowable(AppError.NoInternet))
+            } catch (e: Exception) {
+                ExtractionLogger.log("MULTI", "Error: ${e.message}")
+                Result.failure(e)
             }
-        } catch (e: UnknownHostException) {
-            Result.failure(CustomThrowable(AppError.NoInternet))
-        } catch (e: IOException) {
-            Result.failure(CustomThrowable(AppError.NoInternet))
-        } catch (e: Exception) {
-            ExtractionLogger.log("MULTI", "Error: ${e.message}")
-            Result.failure(e)
         }
-    }
 
     private fun extractXTwitter(parsedUrl: ParsedUrl): Result<List<MediaCandidate>> {
         val apiUrl = parsedUrl.canonicalUrl
@@ -101,7 +108,7 @@ class MultiPlatformExtractor(
 
     private fun extractReddit(parsedUrl: ParsedUrl): Result<List<MediaCandidate>> {
         val jsonUrl = parsedUrl.canonicalUrl.trimEnd('/') + ".json"
-        val request = Request.Builder().url(jsonUrl).header("User-Agent", "CleanSaver/1.0 (Android)").build()
+        val request = Request.Builder().url(jsonUrl).header("User-Agent", "CleanSaver/2.0 (Android)").build()
 
         okHttpClient.newCall(request).execute().use { response ->
             ExtractionLogger.log("REDDIT", "HTTP ${response.code}")
@@ -126,6 +133,9 @@ class MultiPlatformExtractor(
                 ?.replace("&amp;", "&")
 
             if (!videoUrl.isNullOrBlank()) {
+                // Reddit serves DASH video & audio separately; derive companion DASH audio URL for MediaMuxer
+                val basePath = videoUrl.substringBeforeLast("/")
+                val audioUrl = "$basePath/DASH_AUDIO_128.mp4"
                 return Result.success(
                     listOf(
                         MediaCandidate(
@@ -134,6 +144,7 @@ class MultiPlatformExtractor(
                             mediaType = MediaType.VIDEO,
                             downloadUrl = videoUrl,
                             thumbnailUrl = thumb,
+                            audioUrl = audioUrl,
                             caption = title,
                             creatorHandle = author,
                             platform = Platform.REDDIT,
@@ -164,6 +175,92 @@ class MultiPlatformExtractor(
             }
 
             return Result.failure(CustomThrowable(AppError.PostNotFound))
+        }
+    }
+
+    private fun extractTikTok(parsedUrl: ParsedUrl, preferDataSaver: Boolean): Result<List<MediaCandidate>> {
+        val encoded = URLEncoder.encode(parsedUrl.canonicalUrl, "UTF-8")
+        val apiUrl = "https://www.tikwm.com/api/?url=$encoded&hd=1"
+        val request = Request.Builder().url(apiUrl).header("User-Agent", ua).build()
+
+        okHttpClient.newCall(request).execute().use { response ->
+            ExtractionLogger.log("TIKTOK", "HTTP ${response.code}")
+            if (response.isSuccessful) {
+                val body = response.body?.string() ?: ""
+                val root = json.parseToJsonElement(body).jsonObject
+                val data = root["data"]?.jsonObject
+                if (data != null) {
+                    val hdPlay = data["hdplay"]?.jsonPrimitive?.content?.takeIf { it.startsWith("http") }
+                    val sdPlay = data["play"]?.jsonPrimitive?.content?.takeIf { it.startsWith("http") }
+                    val chosen = if (preferDataSaver) (sdPlay ?: hdPlay) else (hdPlay ?: sdPlay)
+                    val cover = data["cover"]?.jsonPrimitive?.content?.takeIf { it.startsWith("http") }
+                    val title = data["title"]?.jsonPrimitive?.content
+                    val author = data["author"]?.jsonObject?.get("unique_id")?.jsonPrimitive?.content
+
+                    if (!chosen.isNullOrBlank()) {
+                        return Result.success(
+                            listOf(
+                                MediaCandidate(
+                                    shortcode = parsedUrl.shortcode,
+                                    slideIndex = 0,
+                                    mediaType = MediaType.VIDEO,
+                                    downloadUrl = chosen,
+                                    thumbnailUrl = cover,
+                                    caption = title,
+                                    creatorHandle = author,
+                                    platform = Platform.TIKTOK,
+                                    sourceUrl = parsedUrl.canonicalUrl
+                                )
+                            )
+                        )
+                    }
+                }
+            }
+        }
+        return extractGenericMetaHtml(parsedUrl)
+    }
+
+    private fun extractYouTubeShorts(parsedUrl: ParsedUrl, preferDataSaver: Boolean): Result<List<MediaCandidate>> {
+        val request = Request.Builder()
+            .url(parsedUrl.canonicalUrl)
+            .header("User-Agent", ua)
+            .header("Accept-Language", "en-US,en;q=0.9")
+            .build()
+
+        okHttpClient.newCall(request).execute().use { response ->
+            ExtractionLogger.log("YOUTUBE", "HTTP ${response.code}")
+            if (response.code == 404) return Result.failure(CustomThrowable(AppError.PostNotFound))
+            if (!response.isSuccessful) return Result.failure(CustomThrowable(AppError.ParserOutdated))
+
+            val html = response.body?.string() ?: ""
+            val streams = mutableListOf<String>()
+            val matcher = ytStreamUrlPattern.matcher(html)
+            while (matcher.find()) {
+                val raw = matcher.group(1) ?: continue
+                streams.add(raw.replace("\\u0026", "&").replace("\\/", "/"))
+            }
+
+            val chosen = if (preferDataSaver) streams.firstOrNull() else streams.lastOrNull()
+            val thumb = "https://i.ytimg.com/vi/${parsedUrl.shortcode}/hqdefault.jpg"
+            val title = matchFirst(ogDescPattern, html)?.replace("&amp;", "&")?.replace("&quot;", "\"")
+
+            if (!chosen.isNullOrBlank()) {
+                return Result.success(
+                    listOf(
+                        MediaCandidate(
+                            shortcode = parsedUrl.shortcode,
+                            slideIndex = 0,
+                            mediaType = MediaType.VIDEO,
+                            downloadUrl = chosen,
+                            thumbnailUrl = thumb,
+                            caption = title,
+                            platform = Platform.YOUTUBE_SHORTS,
+                            sourceUrl = parsedUrl.canonicalUrl
+                        )
+                    )
+                )
+            }
+            return Result.failure(CustomThrowable(AppError.ParserOutdated))
         }
     }
 

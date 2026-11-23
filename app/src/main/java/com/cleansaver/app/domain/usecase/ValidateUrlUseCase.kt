@@ -38,6 +38,14 @@ class ValidateUrlUseCase {
         "^https?://(?:www\\.|[a-z]{2}\\.)?(?:pinterest\\.[a-z.]+/pin/([0-9A-Za-z_-]+)|pin\\.it/([0-9A-Za-z_-]+))(?:/|\\?|$).*",
         Pattern.CASE_INSENSITIVE
     )
+    private val tiktokPattern = Pattern.compile(
+        "^https?://(?:www\\.|m\\.|vm\\.|vt\\.)?tiktok\\.com/(?:@([A-Za-z0-9._]+)/video/([0-9]+)|([A-Za-z0-9_-]{6,20}))(?:/|\\?|$).*",
+        Pattern.CASE_INSENSITIVE
+    )
+    private val youtubeShortsPattern = Pattern.compile(
+        "^https?://(?:www\\.|m\\.)?(?:youtube\\.com/shorts/([A-Za-z0-9_-]{6,20})|youtu\\.be/([A-Za-z0-9_-]{6,20}))(?:/|\\?|$).*",
+        Pattern.CASE_INSENSITIVE
+    )
 
     fun extractAllUrls(input: String): List<String> {
         val urls = mutableListOf<String>()
@@ -159,6 +167,38 @@ class ValidateUrlUseCase {
                     shortcode = pinId,
                     kind = UrlKind.POST,
                     platform = Platform.PINTEREST
+                )
+            )
+        }
+
+        // 7. TikTok
+        val tiktokMatcher = tiktokPattern.matcher(rawUrl)
+        if (tiktokMatcher.matches()) {
+            val videoId = tiktokMatcher.group(2) ?: tiktokMatcher.group(3)
+                ?: return Result.failure(CustomThrowable(AppError.InvalidUrl))
+            return Result.success(
+                ParsedUrl(
+                    rawUrl = rawUrl,
+                    canonicalUrl = rawUrl.substringBefore("?"),
+                    shortcode = videoId,
+                    kind = UrlKind.REEL,
+                    platform = Platform.TIKTOK
+                )
+            )
+        }
+
+        // 8. YouTube Shorts
+        val ytMatcher = youtubeShortsPattern.matcher(rawUrl)
+        if (ytMatcher.matches()) {
+            val videoId = ytMatcher.group(1) ?: ytMatcher.group(2)
+                ?: return Result.failure(CustomThrowable(AppError.InvalidUrl))
+            return Result.success(
+                ParsedUrl(
+                    rawUrl = rawUrl,
+                    canonicalUrl = "https://www.youtube.com/shorts/$videoId",
+                    shortcode = videoId,
+                    kind = UrlKind.REEL,
+                    platform = Platform.YOUTUBE_SHORTS
                 )
             )
         }

@@ -13,9 +13,13 @@ class MediaExtractorChain(
     private val strategies: Map<String, MediaExtractorStrategy>,
     private val multiPlatformExtractor: MultiPlatformExtractor? = null
 ) {
-    suspend fun extract(parsedUrl: ParsedUrl, isRetry: Boolean = false): Result<List<MediaCandidate>> {
+    suspend fun extract(
+        parsedUrl: ParsedUrl,
+        isRetry: Boolean = false,
+        preferDataSaver: Boolean = false
+    ): Result<List<MediaCandidate>> {
         if (parsedUrl.platform != Platform.INSTAGRAM && multiPlatformExtractor != null) {
-            return multiPlatformExtractor.extract(parsedUrl)
+            return multiPlatformExtractor.extract(parsedUrl, preferDataSaver = preferDataSaver)
         }
 
         val config = remoteConfigRepository.getActiveConfig(forceRefresh = false)

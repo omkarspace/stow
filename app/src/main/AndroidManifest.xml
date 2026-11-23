@@ -60,6 +60,19 @@
             </intent-filter>
         </service>
 
+        <!-- Minimal Home Screen Widget for 1-tap Paste & Save -->
+        <receiver
+            android:name=".widget.CleanSaverWidgetProvider"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/cleansaver_widget_info" />
+        </receiver>
+
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"

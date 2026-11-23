@@ -111,7 +111,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
             color = MaterialTheme.colorScheme.onBackground
         )
         Text(
-            text = "Instagram · Threads · X · Reddit · Pinterest",
+            text = "Instagram · Threads · X · Reddit · Pinterest · TikTok · Shorts",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp, bottom = 22.dp)

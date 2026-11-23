@@ -75,6 +75,14 @@ class ValidateUrlUseCaseTest {
         val pin = useCase("https://www.pinterest.com/pin/123456789012345/").getOrThrow()
         assertEquals(Platform.PINTEREST, pin.platform)
         assertEquals("123456789012345", pin.shortcode)
+
+        val tiktok = useCase("https://www.tiktok.com/@creator/video/7345678901234567890").getOrThrow()
+        assertEquals(Platform.TIKTOK, tiktok.platform)
+        assertEquals("7345678901234567890", tiktok.shortcode)
+
+        val ytShorts = useCase("https://www.youtube.com/shorts/dQw4w9WgXcQ").getOrThrow()
+        assertEquals(Platform.YOUTUBE_SHORTS, ytShorts.platform)
+        assertEquals("dQw4w9WgXcQ", ytShorts.shortcode)
     }
 
     @Test
