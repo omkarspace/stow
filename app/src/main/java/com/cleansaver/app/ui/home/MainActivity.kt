@@ -17,15 +17,20 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -36,19 +41,14 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -60,16 +60,24 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.cleansaver.app.CleanSaverApplication
 import com.cleansaver.app.ui.components.DisclaimerBottomSheet
+import com.cleansaver.app.ui.components.StowActionButton
+import com.cleansaver.app.ui.components.StowDarkBlock
 import com.cleansaver.app.ui.library.LibraryScreen
 import com.cleansaver.app.ui.library.LibraryViewModel
 import com.cleansaver.app.ui.settings.SettingsScreen
 import com.cleansaver.app.ui.settings.SettingsViewModel
 import com.cleansaver.app.ui.theme.CleanSaverTheme
+import com.cleansaver.app.ui.theme.StowInkMutedOnDark
+import com.cleansaver.app.ui.theme.StowInkOnDark
+import com.cleansaver.app.ui.theme.StowLavender
+import com.cleansaver.app.ui.theme.StowPineDark
 import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
@@ -107,7 +115,7 @@ class MainActivity : FragmentActivity() {
             val darkTheme = when (settingsState.themeMode) {
                 "LIGHT" -> false
                 "DARK" -> true
-                else -> isSystemInDarkTheme()
+                else -> false // Default to signature BRIK bone-white shell + deep pine blocks
             }
 
             LaunchedEffect(darkTheme) {
@@ -147,65 +155,14 @@ class MainActivity : FragmentActivity() {
                 val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                 val scope = rememberCoroutineScope()
 
-                val navItemColors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = MaterialTheme.colorScheme.onBackground,
-                    selectedTextColor = MaterialTheme.colorScheme.onBackground,
-                    indicatorColor = MaterialTheme.colorScheme.surfaceVariant,
-                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     containerColor = MaterialTheme.colorScheme.background,
                     bottomBar = {
-                        Column {
-                            HorizontalDivider(
-                                thickness = 1.dp,
-                                color = MaterialTheme.colorScheme.outline
-                            )
-                            NavigationBar(
-                                containerColor = MaterialTheme.colorScheme.surface,
-                                tonalElevation = 0.dp
-                            ) {
-                                NavigationBarItem(
-                                    selected = selectedTab == 0,
-                                    onClick = { selectedTab = 0 },
-                                    icon = {
-                                        Icon(
-                                            imageVector = if (selectedTab == 0) Icons.Filled.Download else Icons.Outlined.Download,
-                                            contentDescription = "Save"
-                                        )
-                                    },
-                                    label = { Text("Save", style = MaterialTheme.typography.labelSmall) },
-                                    colors = navItemColors
-                                )
-                                NavigationBarItem(
-                                    selected = selectedTab == 1,
-                                    onClick = { selectedTab = 1 },
-                                    icon = {
-                                        Icon(
-                                            imageVector = if (selectedTab == 1) Icons.Filled.PhotoLibrary else Icons.Outlined.PhotoLibrary,
-                                            contentDescription = "Library"
-                                        )
-                                    },
-                                    label = { Text("Library", style = MaterialTheme.typography.labelSmall) },
-                                    colors = navItemColors
-                                )
-                                NavigationBarItem(
-                                    selected = selectedTab == 2,
-                                    onClick = { selectedTab = 2 },
-                                    icon = {
-                                        Icon(
-                                            imageVector = if (selectedTab == 2) Icons.Filled.Settings else Icons.Outlined.Settings,
-                                            contentDescription = "Settings"
-                                        )
-                                    },
-                                    label = { Text("Settings", style = MaterialTheme.typography.labelSmall) },
-                                    colors = navItemColors
-                                )
-                            }
-                        }
+                        StowFloatingBottomBar(
+                            selectedTab = selectedTab,
+                            onSelectTab = { selectedTab = it }
+                        )
                     }
                 ) { innerPadding ->
                     Box(
@@ -214,7 +171,7 @@ class MainActivity : FragmentActivity() {
                             .padding(innerPadding)
                     ) {
                         when (selectedTab) {
-                            0 -> HomeScreen(viewModel = homeViewModel)
+                            0 -> HomeScreen(viewModel = homeViewModel, libraryViewModel = libraryViewModel)
                             1 -> {
                                 if (settingsState.vaultLockEnabled && !vaultUnlocked) {
                                     VaultLockedView(
@@ -319,46 +276,133 @@ class MainActivity : FragmentActivity() {
     }
 }
 
-@androidx.compose.runtime.Composable
+@Composable
+private fun StowFloatingBottomBar(
+    selectedTab: Int,
+    onSelectTab: (Int) -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                StowNavItem(
+                    label = "STOW",
+                    icon = if (selectedTab == 0) Icons.Filled.Download else Icons.Outlined.Download,
+                    selected = selectedTab == 0,
+                    onClick = { onSelectTab(0) },
+                    modifier = Modifier.weight(1f)
+                )
+                StowNavItem(
+                    label = "LIBRARY",
+                    icon = if (selectedTab == 1) Icons.Filled.PhotoLibrary else Icons.Outlined.PhotoLibrary,
+                    selected = selectedTab == 1,
+                    onClick = { onSelectTab(1) },
+                    modifier = Modifier.weight(1f)
+                )
+                StowNavItem(
+                    label = "SETTINGS",
+                    icon = if (selectedTab == 2) Icons.Filled.Settings else Icons.Outlined.Settings,
+                    selected = selectedTab == 2,
+                    onClick = { onSelectTab(2) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StowNavItem(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .padding(horizontal = 4.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        color = if (selected) StowLavender else androidx.compose.ui.graphics.Color.Transparent
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = if (selected) StowPineDark else StowInkMutedOnDark,
+                modifier = Modifier.size(18.dp)
+            )
+            if (selected) {
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = StowPineDark
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun VaultLockedView(onUnlockClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .padding(horizontal = 14.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.Center
     ) {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.size(64.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Lock,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(18.dp)
+        StowDarkBlock {
+            Surface(
+                shape = CircleShape,
+                color = StowLavender,
+                modifier = Modifier.size(52.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = null,
+                    tint = StowPineDark,
+                    modifier = Modifier.padding(14.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Vault locked.",
+                style = MaterialTheme.typography.headlineLarge,
+                color = StowInkOnDark
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "Verify your identity to access your saved media.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = StowInkMutedOnDark
             )
         }
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Library Locked",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = "Authenticate to view your saved media.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(20.dp))
-        Button(
+        Spacer(modifier = Modifier.height(14.dp))
+        StowActionButton(
+            text = "Unlock Library",
             onClick = onUnlockClick,
-            shape = RoundedCornerShape(12.dp),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
-        ) {
-            Text("Unlock", style = MaterialTheme.typography.labelLarge)
-        }
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }

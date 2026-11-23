@@ -1,6 +1,8 @@
 package com.cleansaver.app.ui.components
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,8 +16,13 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.cleansaver.app.ui.theme.StowInkMutedOnDark
+import com.cleansaver.app.ui.theme.StowInkOnDark
+import com.cleansaver.app.ui.theme.StowLavender
+import com.cleansaver.app.ui.theme.StowPineDark
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,26 +33,29 @@ fun DisclaimerBottomSheet(
     ModalBottomSheet(
         onDismissRequest = { /* Require explicit accept */ },
         sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        containerColor = MaterialTheme.colorScheme.surface
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = StowPineDark
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 12.dp)
+                .padding(horizontal = 24.dp, vertical = 14.dp)
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = "STOW®", style = MaterialTheme.typography.headlineMedium, color = StowInkOnDark)
+                StowLavenderBadge(text = "ON-DEVICE")
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
             Text(
-                text = "Welcome to Stow",
+                text = "Save public media cleanly, with zero clutter.",
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
-                text = "A minimal, on-device utility for saving public media cleanly.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
+                color = StowInkOnDark
             )
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -55,24 +65,24 @@ fun DisclaimerBottomSheet(
                     "• Zero ads, zero logins, and zero analytics.\n" +
                     "• Independent utility unaffiliated with Meta, X, Reddit, Pinterest, TikTok, or YouTube. Respect creator rights.",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = StowInkMutedOnDark
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(22.dp))
 
             Button(
                 onClick = onAccept,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp),
-                shape = RoundedCornerShape(12.dp),
+                    .height(50.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = StowLavender,
+                    contentColor = StowPineDark
                 ),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
             ) {
-                Text("Continue", style = MaterialTheme.typography.labelLarge)
+                Text("CONTINUE", style = MaterialTheme.typography.labelLarge)
             }
 
             Spacer(modifier = Modifier.height(20.dp))

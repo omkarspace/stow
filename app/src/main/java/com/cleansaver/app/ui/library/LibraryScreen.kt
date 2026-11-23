@@ -19,8 +19,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
@@ -75,7 +75,17 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.cleansaver.app.data.local.DownloadedMediaEntity
 import com.cleansaver.app.ui.components.MediaPreviewDialog
+import com.cleansaver.app.ui.components.StowDarkBlock
+import com.cleansaver.app.ui.components.StowStatTile
+import com.cleansaver.app.ui.components.StowTopBarBlock
 import com.cleansaver.app.ui.home.formatBytes
+import com.cleansaver.app.ui.theme.ErrorRedDark
+import com.cleansaver.app.ui.theme.StowInkMutedOnDark
+import com.cleansaver.app.ui.theme.StowInkOnDark
+import com.cleansaver.app.ui.theme.StowLavender
+import com.cleansaver.app.ui.theme.StowPineDark
+import com.cleansaver.app.ui.theme.StowPineElevated
+import com.cleansaver.app.ui.theme.StowPineMuted
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -92,499 +102,443 @@ fun LibraryScreen(viewModel: LibraryViewModel) {
     var showSortMenu by remember { mutableStateOf(false) }
 
     val inSelectionMode = state.selectedIds.isNotEmpty()
+    val dateFormat = remember { SimpleDateFormat("MMM d", Locale.getDefault()) }
 
     LaunchedEffect(Unit) {
         viewModel.pruneStaleEntries()
     }
 
-    Column(
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 20.dp, vertical = 24.dp)
+            .padding(horizontal = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(top = 14.dp, bottom = 18.dp)
     ) {
-        if (inSelectionMode) {
-            // Minimal Bulk Selection Header
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+        // 1. Top Wordmark or Bulk Selection Bar
+        item(span = { GridItemSpan(2) }) {
+            if (inSelectionMode) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp),
+                    color = StowPineDark
                 ) {
-                    IconButton(onClick = { viewModel.clearSelection() }) {
-                        Icon(Icons.Default.Close, contentDescription = "Cancel selection")
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { viewModel.clearSelection() }) {
+                            Icon(Icons.Default.Close, contentDescription = "Cancel", tint = StowInkOnDark)
+                        }
+                        Text(
+                            text = "${state.selectedIds.size} selected",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = StowInkOnDark,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = {
+                            val uris = ArrayList(
+                                state.items
+                                    .filter { state.selectedIds.contains(it.id) }
+                                    .map { Uri.parse(it.mediaStoreUri) }
+                            )
+                            if (uris.isNotEmpty()) {
+                                try {
+                                    val shareIntent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                                        type = "*/*"
+                                        putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(Intent.createChooser(shareIntent, "Share ${uris.size} items"))
+                                } catch (_: Exception) {}
+                            }
+                        }) {
+                            Icon(Icons.Default.Share, contentDescription = "Share selected", tint = StowLavender)
+                        }
+                        IconButton(onClick = { showBulkDeleteConfirm = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete selected", tint = ErrorRedDark)
+                        }
                     }
-                    Text(
-                        text = "${state.selectedIds.size} selected",
-                        style = MaterialTheme.typography.titleMedium,
+                }
+            } else {
+                StowTopBarBlock(badgeText = "${state.totalCount} ITEMS")
+            }
+        }
+
+        // 2. Paired Bento Stat Tiles
+        if (state.totalCount > 0) {
+            item(span = { GridItemSpan(2) }) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    StowStatTile(
+                        title = "Total stowed",
+                        subtitle = "${state.videoCount} vid · ${state.imageCount} img · ${state.audioCount} aud",
+                        value = "${state.totalCount}",
                         modifier = Modifier.weight(1f)
                     )
-                    IconButton(onClick = {
-                        val uris = ArrayList(
-                            state.items
-                                .filter { state.selectedIds.contains(it.id) }
-                                .map { Uri.parse(it.mediaStoreUri) }
-                        )
-                        if (uris.isNotEmpty()) {
-                            try {
-                                val shareIntent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
-                                    type = "*/*"
-                                    putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                }
-                                context.startActivity(Intent.createChooser(shareIntent, "Share ${uris.size} items"))
-                            } catch (_: Exception) {}
-                        }
-                    }) {
-                        Icon(Icons.Default.Share, contentDescription = "Share selected")
-                    }
-                    IconButton(onClick = { showBulkDeleteConfirm = true }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete selected", tint = MaterialTheme.colorScheme.error)
-                    }
+                    StowStatTile(
+                        title = "Storage",
+                        subtitle = "Vid ${formatBytes(state.videoSizeBytes)} · Img ${formatBytes(state.imageSizeBytes)}",
+                        value = formatBytes(state.totalSizeBytes),
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
-            Spacer(modifier = Modifier.height(14.dp))
-        } else {
-            // Minimal Header with Storage Breakdown & Sort
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Library",
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = if (state.totalCount == 0) {
-                            "Your saved Reels, photos, and audio appear here."
-                        } else {
-                            "${state.totalCount} saved · ${formatBytes(state.totalSizeBytes)}"
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-                    if (state.totalCount > 0) {
-                        Text(
-                            text = "Videos ${formatBytes(state.videoSizeBytes)} · Photos ${formatBytes(state.imageSizeBytes)} · Audio ${formatBytes(state.audioSizeBytes)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
 
-                if (state.totalCount > 0) {
-                    Box {
-                        IconButton(onClick = { showSortMenu = true }) {
-                            Icon(
-                                imageVector = Icons.Default.Sort,
-                                contentDescription = "Sort",
-                                tint = MaterialTheme.colorScheme.onBackground
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = showSortMenu,
-                            onDismissRequest = { showSortMenu = false }
-                        ) {
-                            listOf(
-                                "NEWEST" to "Newest first",
-                                "OLDEST" to "Oldest first",
-                                "LARGEST" to "Largest file",
-                                "CREATOR" to "Creator A–Z"
-                            ).forEach { (key, label) ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = if (state.sortBy == key) "• $label" else label,
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-                                    },
-                                    onClick = {
-                                        viewModel.setSortBy(key)
-                                        showSortMenu = false
-                                    }
+            // 3. Search + Sort + Filter Chips on Light Canvas
+            item(span = { GridItemSpan(2) }) {
+                Column(modifier = Modifier.padding(top = 4.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = state.searchQuery,
+                            onValueChange = { viewModel.setSearchQuery(it) },
+                            placeholder = {
+                                Text(
+                                    text = "Search caption, @creator, tag...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
                                 )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            },
+                            trailingIcon = {
+                                if (state.searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                                        Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+                                focusedBorderColor = StowPineDark,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f),
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent
+                            )
+                        )
+
+                        Box {
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = StowPineDark
+                            ) {
+                                IconButton(onClick = { showSortMenu = true }) {
+                                    Icon(Icons.Default.Sort, contentDescription = "Sort", tint = StowLavender)
+                                }
+                            }
+                            DropdownMenu(expanded = showSortMenu, onDismissRequest = { showSortMenu = false }) {
+                                listOf(
+                                    "NEWEST" to "Newest first",
+                                    "OLDEST" to "Oldest first",
+                                    "LARGEST" to "Largest file",
+                                    "CREATOR" to "Creator A–Z"
+                                ).forEach { (key, label) ->
+                                    DropdownMenuItem(
+                                        text = { Text(if (state.sortBy == key) "• $label" else label) },
+                                        onClick = {
+                                            viewModel.setSortBy(key)
+                                            showSortMenu = false
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
-                }
-            }
-            Spacer(modifier = Modifier.height(14.dp))
-        }
 
-        if (state.totalCount > 0) {
-            // Search Bar (searches filename, shortcode, caption, creator, tag, platform)
-            OutlinedTextField(
-                value = state.searchQuery,
-                onValueChange = { viewModel.setSearchQuery(it) },
-                placeholder = {
-                    Text(
-                        text = "Search caption, @creator, tag...",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    val chipColors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = StowPineDark,
+                        selectedLabelColor = StowLavender,
+                        containerColor = Color.Transparent,
+                        labelColor = MaterialTheme.colorScheme.onBackground
                     )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
-                    )
-                },
-                trailingIcon = {
-                    if (state.searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.setSearchQuery("") }) {
-                            Icon(
-                                imageVector = Icons.Default.Clear,
-                                contentDescription = "Clear search",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                )
-            )
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            val chipColors = FilterChipDefaults.filterChipColors(
-                selectedContainerColor = MaterialTheme.colorScheme.primary,
-                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                containerColor = MaterialTheme.colorScheme.surface,
-                labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            // Type & Favorites Filter Row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                listOf(
-                    "ALL" to "All (${state.totalCount})",
-                    "VIDEO" to "Videos (${state.videoCount})",
-                    "IMAGE" to "Photos (${state.imageCount})",
-                    "AUDIO" to "Audio (${state.audioCount})",
-                    "FAVORITES" to "Favorites (${state.favoriteCount})"
-                ).forEach { (type, label) ->
-                    FilterChip(
-                        selected = state.filterType == type,
-                        onClick = { viewModel.setFilter(type) },
-                        label = { Text(label, style = MaterialTheme.typography.labelMedium) },
-                        shape = RoundedCornerShape(10.dp),
-                        colors = chipColors,
-                        border = FilterChipDefaults.filterChipBorder(
-                            enabled = true,
-                            selected = state.filterType == type,
-                            borderColor = MaterialTheme.colorScheme.outline
-                        )
-                    )
-                }
-            }
-
-            // Custom Collection Tags Row (shown only when tags exist)
-            if (state.availableTags.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    state.availableTags.forEach { tag ->
-                        FilterChip(
-                            selected = state.selectedTag == tag,
-                            onClick = { viewModel.setSelectedTag(tag) },
-                            label = { Text("#$tag", style = MaterialTheme.typography.labelSmall) },
-                            shape = RoundedCornerShape(8.dp),
-                            colors = chipColors,
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = state.selectedTag == tag,
-                                borderColor = MaterialTheme.colorScheme.outline
-                            )
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-        }
-
-        if (state.items.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = 48.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(24.dp)
-                ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.size(64.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.FolderOpen,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(18.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = if (state.totalCount == 0) "No saved media" else "No matching items",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = if (state.totalCount == 0) {
-                            "Paste a link on the Save tab or share directly from Instagram, X, Threads, Reddit, or Pinterest."
-                        } else {
-                            "Try clearing your search or switching filters."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-        } else {
-            val dateFormat = remember { SimpleDateFormat("MMM d", Locale.getDefault()) }
-
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(bottom = 16.dp)
-            ) {
-                items(state.items, key = { it.id }) { item ->
-                    val isVideo = item.mediaType == "VIDEO"
-                    val isAudio = item.mediaType == "AUDIO"
-                    val isSelected = state.selectedIds.contains(item.id)
-
-                    Surface(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .combinedClickable(
-                                onClick = {
-                                    if (inSelectionMode) {
-                                        viewModel.toggleSelect(item.id)
-                                    } else if (isAudio) {
-                                        try {
-                                            val playIntent = Intent(Intent.ACTION_VIEW).apply {
-                                                setDataAndType(Uri.parse(item.mediaStoreUri), "audio/*")
-                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                            }
-                                            context.startActivity(playIntent)
-                                        } catch (_: Exception) {}
-                                    } else {
-                                        previewItem = item
-                                    }
-                                },
-                                onLongClick = { viewModel.toggleSelect(item.id) }
-                            ),
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        border = BorderStroke(
-                            width = if (isSelected) 2.dp else 1.dp,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                        )
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .aspectRatio(1f)
-                                    .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                            ) {
-                                if (isAudio) {
-                                    Icon(
-                                        imageVector = Icons.Default.AudioFile,
-                                        contentDescription = "Audio",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier
-                                            .size(44.dp)
-                                            .align(Alignment.Center)
-                                    )
-                                } else {
-                                    AsyncImage(
-                                        model = Uri.parse(item.mediaStoreUri),
-                                        contentDescription = item.fileName,
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                    if (isVideo) {
-                                        Surface(
-                                            shape = CircleShape,
-                                            color = Color.Black.copy(alpha = 0.6f),
-                                            modifier = Modifier
-                                                .size(34.dp)
-                                                .align(Alignment.Center)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.PlayArrow,
-                                                contentDescription = "Video",
-                                                tint = Color.White,
-                                                modifier = Modifier.padding(7.dp)
-                                            )
-                                        }
-                                    }
-                                }
+                        listOf(
+                            "ALL" to "ALL (${state.totalCount})",
+                            "VIDEO" to "VIDEOS (${state.videoCount})",
+                            "IMAGE" to "PHOTOS (${state.imageCount})",
+                            "AUDIO" to "AUDIO (${state.audioCount})",
+                            "FAVORITES" to "FAVS (${state.favoriteCount})"
+                        ).forEach { (type, label) ->
+                            FilterChip(
+                                selected = state.filterType == type,
+                                onClick = { viewModel.setFilter(type) },
+                                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                                shape = RoundedCornerShape(10.dp),
+                                colors = chipColors,
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled = true,
+                                    selected = state.filterType == type,
+                                    borderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f)
+                                )
+                            )
+                        }
+                    }
 
-                                // Top-right Favorite or Selection Indicator
-                                if (isSelected) {
-                                    Icon(
-                                        imageVector = Icons.Default.CheckCircle,
-                                        contentDescription = "Selected",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier
-                                            .align(Alignment.TopEnd)
-                                            .padding(8.dp)
-                                            .size(22.dp)
-                                    )
+                    if (state.availableTags.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            state.availableTags.forEach { tag ->
+                                FilterChip(
+                                    selected = state.selectedTag == tag,
+                                    onClick = { viewModel.setSelectedTag(tag) },
+                                    label = { Text("#$tag", style = MaterialTheme.typography.labelSmall) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = chipColors
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Empty State or 2-Column Dark Media Bento Grid
+        if (state.items.isEmpty()) {
+            item(span = { GridItemSpan(2) }) {
+                StowDarkBlock(modifier = Modifier.padding(top = 6.dp)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = StowLavender,
+                            modifier = Modifier.size(56.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FolderOpen,
+                                contentDescription = null,
+                                tint = StowPineDark,
+                                modifier = Modifier.padding(15.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = if (state.totalCount == 0) "Nothing stowed yet." else "No matching items.",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = StowInkOnDark
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = if (state.totalCount == 0) {
+                                "Paste a link on the Stow tab or share directly from any supported app."
+                            } else {
+                                "Try clearing your search or switching filters."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = StowInkMutedOnDark,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        } else {
+            items(state.items, key = { it.id }) { item ->
+                val isVideo = item.mediaType == "VIDEO"
+                val isAudio = item.mediaType == "AUDIO"
+                val isSelected = state.selectedIds.contains(item.id)
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .combinedClickable(
+                            onClick = {
+                                if (inSelectionMode) {
+                                    viewModel.toggleSelect(item.id)
+                                } else if (isAudio) {
+                                    try {
+                                        val playIntent = Intent(Intent.ACTION_VIEW).apply {
+                                            setDataAndType(Uri.parse(item.mediaStoreUri), "audio/*")
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        }
+                                        context.startActivity(playIntent)
+                                    } catch (_: Exception) {}
                                 } else {
-                                    IconButton(
-                                        onClick = { viewModel.toggleFavorite(item) },
+                                    previewItem = item
+                                }
+                            },
+                            onLongClick = { viewModel.toggleSelect(item.id) }
+                        ),
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = if (isSelected) BorderStroke(2.dp, StowLavender) else null
+                ) {
+                    Column {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                                .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                                .background(StowPineElevated)
+                        ) {
+                            if (isAudio) {
+                                Icon(
+                                    imageVector = Icons.Default.AudioFile,
+                                    contentDescription = "Audio",
+                                    tint = StowLavender,
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .align(Alignment.Center)
+                                )
+                            } else {
+                                AsyncImage(
+                                    model = Uri.parse(item.mediaStoreUri),
+                                    contentDescription = item.fileName,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                                if (isVideo) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = StowPineDark.copy(alpha = 0.75f),
                                         modifier = Modifier
-                                            .align(Alignment.TopEnd)
-                                            .padding(4.dp)
-                                            .size(30.dp)
-                                            .background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                                            .size(34.dp)
+                                            .align(Alignment.Center)
                                     ) {
                                         Icon(
-                                            imageVector = if (item.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                                            contentDescription = "Favorite",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-
-                                if (item.tag.isNotBlank()) {
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = Color.Black.copy(alpha = 0.65f),
-                                        modifier = Modifier
-                                            .align(Alignment.BottomStart)
-                                            .padding(6.dp)
-                                    ) {
-                                        Text(
-                                            text = "#${item.tag}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = Color.White,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            imageVector = Icons.Default.PlayArrow,
+                                            contentDescription = "Video",
+                                            tint = StowLavender,
+                                            modifier = Modifier.padding(7.dp)
                                         )
                                     }
                                 }
                             }
 
-                            Column(modifier = Modifier.padding(10.dp)) {
-                                Text(
-                                    text = item.creatorHandle.takeIf { it.isNotBlank() }?.let { "@$it" } ?: item.shortcode,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = "Selected",
+                                    tint = StowLavender,
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(8.dp)
+                                        .size(22.dp)
                                 )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = "${dateFormat.format(Date(item.createdAtMs))} · ${formatBytes(item.fileSizeBytes)}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End
+                            } else {
+                                IconButton(
+                                    onClick = { viewModel.toggleFavorite(item) },
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(6.dp)
+                                        .size(28.dp)
+                                        .background(StowPineDark.copy(alpha = 0.65f), CircleShape)
                                 ) {
-                                    IconButton(
-                                        onClick = { itemToTag = item },
-                                        modifier = Modifier.size(28.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Label,
-                                            contentDescription = "Tag",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(15.dp)
-                                        )
-                                    }
-                                    if (item.sourceUrl.startsWith("http")) {
-                                        IconButton(
-                                            onClick = {
-                                                try {
-                                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.sourceUrl)))
-                                                } catch (_: Exception) {}
-                                            },
-                                            modifier = Modifier.size(28.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.OpenInNew,
-                                                contentDescription = "Open original post",
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(15.dp)
-                                            )
-                                        }
-                                    }
+                                    Icon(
+                                        imageVector = if (item.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                                        contentDescription = "Favorite",
+                                        tint = if (item.isFavorite) StowLavender else StowInkOnDark,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                }
+                            }
+
+                            if (item.tag.isNotBlank()) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = StowLavender,
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .padding(8.dp)
+                                ) {
+                                    Text(
+                                        text = "#${item.tag.uppercase()}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = StowPineDark,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                            Text(
+                                text = item.creatorHandle.takeIf { it.isNotBlank() }?.let { "@$it" } ?: item.shortcode,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = StowInkOnDark,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "${dateFormat.format(Date(item.createdAtMs))} · ${formatBytes(item.fileSizeBytes)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = StowInkMutedOnDark,
+                                maxLines = 1
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                IconButton(onClick = { itemToTag = item }, modifier = Modifier.size(26.dp)) {
+                                    Icon(Icons.Default.Label, contentDescription = "Tag", tint = StowInkMutedOnDark, modifier = Modifier.size(14.dp))
+                                }
+                                if (item.sourceUrl.startsWith("http")) {
                                     IconButton(
                                         onClick = {
                                             try {
-                                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                                    type = when {
-                                                        isVideo -> "video/*"
-                                                        isAudio -> "audio/*"
-                                                        else -> "image/*"
-                                                    }
-                                                    putExtra(Intent.EXTRA_STREAM, Uri.parse(item.mediaStoreUri))
-                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                                }
-                                                context.startActivity(Intent.createChooser(shareIntent, "Share Media"))
+                                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.sourceUrl)))
                                             } catch (_: Exception) {}
                                         },
-                                        modifier = Modifier.size(28.dp)
+                                        modifier = Modifier.size(26.dp)
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Share,
-                                            contentDescription = "Share",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(15.dp)
-                                        )
+                                        Icon(Icons.Default.OpenInNew, contentDescription = "Open", tint = StowInkMutedOnDark, modifier = Modifier.size(14.dp))
                                     }
-                                    IconButton(
-                                        onClick = { itemToDelete = item },
-                                        modifier = Modifier.size(28.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Delete,
-                                            contentDescription = "Delete",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(15.dp)
-                                        )
-                                    }
+                                }
+                                IconButton(
+                                    onClick = {
+                                        try {
+                                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                type = when {
+                                                    isVideo -> "video/*"
+                                                    isAudio -> "audio/*"
+                                                    else -> "image/*"
+                                                }
+                                                putExtra(Intent.EXTRA_STREAM, Uri.parse(item.mediaStoreUri))
+                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            }
+                                            context.startActivity(Intent.createChooser(shareIntent, "Share Media"))
+                                        } catch (_: Exception) {}
+                                    },
+                                    modifier = Modifier.size(26.dp)
+                                ) {
+                                    Icon(Icons.Default.Share, contentDescription = "Share", tint = StowInkMutedOnDark, modifier = Modifier.size(14.dp))
+                                }
+                                IconButton(onClick = { itemToDelete = item }, modifier = Modifier.size(26.dp)) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = StowInkMutedOnDark, modifier = Modifier.size(14.dp))
                                 }
                             }
                         }
@@ -607,15 +561,21 @@ fun LibraryScreen(viewModel: LibraryViewModel) {
         var tagInput by remember(item.id) { mutableStateOf(item.tag) }
         AlertDialog(
             onDismissRequest = { itemToTag = null },
-            containerColor = MaterialTheme.colorScheme.surface,
-            title = { Text("Collection tag", style = MaterialTheme.typography.titleLarge) },
+            containerColor = StowPineDark,
+            title = { Text("Collection tag", style = MaterialTheme.typography.titleLarge, color = StowInkOnDark) },
             text = {
                 OutlinedTextField(
                     value = tagInput,
                     onValueChange = { tagInput = it },
-                    placeholder = { Text("e.g. Design, Recipes, Workouts") },
+                    placeholder = { Text("Design, Recipes, Workouts", color = StowInkMutedOnDark) },
                     singleLine = true,
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = StowInkOnDark,
+                        unfocusedTextColor = StowInkOnDark,
+                        focusedBorderColor = StowLavender,
+                        unfocusedBorderColor = StowPineMuted
+                    )
                 )
             },
             confirmButton = {
@@ -624,29 +584,32 @@ fun LibraryScreen(viewModel: LibraryViewModel) {
                         viewModel.setTag(item, tagInput)
                         itemToTag = null
                     },
+                    colors = ButtonDefaults.buttonColors(containerColor = StowLavender, contentColor = StowPineDark),
                     shape = RoundedCornerShape(10.dp),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                 ) {
-                    Text("Save")
+                    Text("SAVE", style = MaterialTheme.typography.labelSmall)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { itemToTag = null }) { Text("Cancel") }
+                TextButton(onClick = { itemToTag = null }) {
+                    Text("CANCEL", color = StowInkMutedOnDark, style = MaterialTheme.typography.labelSmall)
+                }
             },
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(22.dp)
         )
     }
 
     itemToDelete?.let { item ->
         AlertDialog(
             onDismissRequest = { itemToDelete = null },
-            containerColor = MaterialTheme.colorScheme.surface,
-            title = { Text("Delete item?", style = MaterialTheme.typography.titleLarge) },
+            containerColor = StowPineDark,
+            title = { Text("Delete item?", style = MaterialTheme.typography.titleLarge, color = StowInkOnDark) },
             text = {
                 Text(
                     text = "Remove ${item.fileName} from your gallery and library?",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = StowInkMutedOnDark
                 )
             },
             confirmButton = {
@@ -655,33 +618,32 @@ fun LibraryScreen(viewModel: LibraryViewModel) {
                         viewModel.deleteItem(item)
                         itemToDelete = null
                     },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error,
-                        contentColor = MaterialTheme.colorScheme.onError
-                    ),
+                    colors = ButtonDefaults.buttonColors(containerColor = ErrorRedDark, contentColor = StowPineDark),
                     shape = RoundedCornerShape(10.dp),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                 ) {
-                    Text("Delete")
+                    Text("DELETE", style = MaterialTheme.typography.labelSmall)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { itemToDelete = null }) { Text("Cancel") }
+                TextButton(onClick = { itemToDelete = null }) {
+                    Text("CANCEL", color = StowInkMutedOnDark, style = MaterialTheme.typography.labelSmall)
+                }
             },
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(22.dp)
         )
     }
 
     if (showBulkDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showBulkDeleteConfirm = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            title = { Text("Delete ${state.selectedIds.size} items?", style = MaterialTheme.typography.titleLarge) },
+            containerColor = StowPineDark,
+            title = { Text("Delete ${state.selectedIds.size} items?", style = MaterialTheme.typography.titleLarge, color = StowInkOnDark) },
             text = {
                 Text(
                     text = "Selected files will be removed from your gallery and library.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = StowInkMutedOnDark
                 )
             },
             confirmButton = {
@@ -690,20 +652,19 @@ fun LibraryScreen(viewModel: LibraryViewModel) {
                         viewModel.deleteSelected()
                         showBulkDeleteConfirm = false
                     },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error,
-                        contentColor = MaterialTheme.colorScheme.onError
-                    ),
+                    colors = ButtonDefaults.buttonColors(containerColor = ErrorRedDark, contentColor = StowPineDark),
                     shape = RoundedCornerShape(10.dp),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                 ) {
-                    Text("Delete all")
+                    Text("DELETE ALL", style = MaterialTheme.typography.labelSmall)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showBulkDeleteConfirm = false }) { Text("Cancel") }
+                TextButton(onClick = { showBulkDeleteConfirm = false }) {
+                    Text("CANCEL", color = StowInkMutedOnDark, style = MaterialTheme.typography.labelSmall)
+                }
             },
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(22.dp)
         )
     }
 }

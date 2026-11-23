@@ -3,7 +3,6 @@ package com.cleansaver.app.ui.settings
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,7 +33,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -49,350 +47,303 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.cleansaver.app.ui.components.StowDarkBlock
+import com.cleansaver.app.ui.components.StowTopBarBlock
+import com.cleansaver.app.ui.theme.ErrorRedDark
+import com.cleansaver.app.ui.theme.StowInkMutedOnDark
+import com.cleansaver.app.ui.theme.StowInkOnDark
+import com.cleansaver.app.ui.theme.StowLavender
+import com.cleansaver.app.ui.theme.StowPineDark
+import com.cleansaver.app.ui.theme.StowPineElevated
+import com.cleansaver.app.ui.theme.StowPineMuted
 import com.cleansaver.app.ui.theme.SuccessGreenDark
-import com.cleansaver.app.ui.theme.SuccessGreenLight
 
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    val successColor = if (isSystemInDarkTheme()) SuccessGreenDark else SuccessGreenLight
     var showClearConfirm by remember { mutableStateOf(false) }
     var showDiagnostics by remember { mutableStateOf(false) }
     var albumDraft by remember(state.customAlbumName) { mutableStateOf(state.customAlbumName) }
 
     val chipColors = FilterChipDefaults.filterChipColors(
-        selectedContainerColor = MaterialTheme.colorScheme.primary,
-        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-        containerColor = MaterialTheme.colorScheme.background,
-        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+        selectedContainerColor = StowLavender,
+        selectedLabelColor = StowPineDark,
+        containerColor = StowPineElevated,
+        labelColor = StowInkMutedOnDark
     )
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 24.dp)
+            .padding(horizontal = 14.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text(
-            text = "Settings",
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = "Appearance, automation, storage, and privacy.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
-        )
+        StowTopBarBlock(badgeText = "V${state.appVersion}")
 
-        // Section 1: Appearance & Automation
-        SectionLabel("Preferences")
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Theme", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                Spacer(modifier = Modifier.height(10.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    listOf("SYSTEM" to "System", "LIGHT" to "Light", "DARK" to "Dark").forEach { (mode, label) ->
-                        FilterChip(
-                            selected = state.themeMode == mode,
-                            onClick = { viewModel.setThemeMode(mode) },
-                            label = { Text(label, style = MaterialTheme.typography.labelMedium) },
-                            shape = RoundedCornerShape(10.dp),
-                            colors = chipColors,
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = state.themeMode == mode,
-                                borderColor = MaterialTheme.colorScheme.outline
-                            )
-                        )
-                    }
-                }
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = MaterialTheme.colorScheme.outline)
-
-                SettingsToggleRow(
-                    title = "Clipboard auto-detect",
-                    subtitle = "Extract supported links automatically on app focus",
-                    checked = state.clipboardAutoDetect,
-                    onCheckedChange = { viewModel.setClipboardAutoDetect(it) }
-                )
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = MaterialTheme.colorScheme.outline)
-
-                SettingsToggleRow(
-                    title = "Instant 1-tap Share save",
-                    subtitle = "Skip preview and download immediately when sharing links",
-                    checked = state.instantShareSave,
-                    onCheckedChange = { viewModel.setInstantShareSave(it) }
-                )
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = MaterialTheme.colorScheme.outline)
-
-                SettingsToggleRow(
-                    title = "Wi-Fi only downloads",
-                    subtitle = "Block downloads on cellular data",
-                    checked = state.wifiOnlyDownloads,
-                    onCheckedChange = { viewModel.setWifiOnlyDownloads(it) }
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // Section 2: Files & Quality
-        SectionLabel("Downloads & Storage")
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Stream quality", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("BEST" to "Best available", "DATA_SAVER" to "Data saver").forEach { (q, label) ->
-                        FilterChip(
-                            selected = state.qualityPreference == q,
-                            onClick = { viewModel.setQualityPreference(q) },
-                            label = { Text(label, style = MaterialTheme.typography.labelMedium) },
-                            shape = RoundedCornerShape(10.dp),
-                            colors = chipColors,
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = state.qualityPreference == q,
-                                borderColor = MaterialTheme.colorScheme.outline
-                            )
-                        )
-                    }
-                }
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = MaterialTheme.colorScheme.outline)
-
-                Text("File naming", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("DEFAULT" to "Stow_code", "CREATOR_DATE" to "Creator_Date").forEach { (p, label) ->
-                        FilterChip(
-                            selected = state.fileNamingPattern == p,
-                            onClick = { viewModel.setFileNamingPattern(p) },
-                            label = { Text(label, style = MaterialTheme.typography.labelMedium) },
-                            shape = RoundedCornerShape(10.dp),
-                            colors = chipColors,
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = state.fileNamingPattern == p,
-                                borderColor = MaterialTheme.colorScheme.outline
-                            )
-                        )
-                    }
-                }
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = MaterialTheme.colorScheme.outline)
-
-                Text("Gallery subfolder", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedTextField(
-                        value = albumDraft,
-                        onValueChange = { albumDraft = it },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
+        // Block 1: Appearance & Automation
+        StowDarkBlock {
+            Text("Appearance", style = MaterialTheme.typography.titleLarge, color = StowInkOnDark)
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("SYSTEM" to "BRIK", "LIGHT" to "BONE", "DARK" to "NIGHT").forEach { (mode, label) ->
+                    FilterChip(
+                        selected = state.themeMode == mode,
+                        onClick = { viewModel.setThemeMode(mode) },
+                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
                         shape = RoundedCornerShape(10.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                        colors = chipColors,
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = state.themeMode == mode,
+                            borderColor = StowPineMuted
                         )
                     )
-                    OutlinedButton(
-                        onClick = { viewModel.setCustomAlbumName(albumDraft) },
-                        enabled = albumDraft.trim() != state.customAlbumName && albumDraft.isNotBlank(),
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-                    ) {
-                        Text("Save", color = MaterialTheme.colorScheme.onSurface)
-                    }
                 }
             }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = StowPineMuted)
+
+            SettingsToggleRow(
+                title = "Clipboard auto-detect",
+                subtitle = "Extract supported links automatically on focus",
+                checked = state.clipboardAutoDetect,
+                onCheckedChange = { viewModel.setClipboardAutoDetect(it) }
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = StowPineMuted)
+
+            SettingsToggleRow(
+                title = "Instant 1-tap Share save",
+                subtitle = "Skip preview and download immediately on share",
+                checked = state.instantShareSave,
+                onCheckedChange = { viewModel.setInstantShareSave(it) }
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = StowPineMuted)
+
+            SettingsToggleRow(
+                title = "Wi-Fi only downloads",
+                subtitle = "Block downloads on cellular data",
+                checked = state.wifiOnlyDownloads,
+                onCheckedChange = { viewModel.setWifiOnlyDownloads(it) }
+            )
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        // Block 2: Downloads & Storage
+        StowDarkBlock {
+            Text("Downloads & storage", style = MaterialTheme.typography.titleLarge, color = StowInkOnDark)
+            Spacer(modifier = Modifier.height(12.dp))
 
-        // Section 3: Privacy & Vault
-        SectionLabel("Privacy & Security")
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                SettingsToggleRow(
-                    title = "Biometric vault lock",
-                    subtitle = "Require fingerprint, face, or PIN to open Library",
-                    checked = state.vaultLockEnabled,
-                    onCheckedChange = { viewModel.setVaultLockEnabled(it) }
-                )
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = MaterialTheme.colorScheme.outline)
-
-                Text(
-                    text = "Stow runs 100% on-device with zero ads, zero logins, and zero analytics. Unaffiliated with Meta, X, Reddit, Pinterest, TikTok, or YouTube. Respect creator rights.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Text("Stream quality", style = MaterialTheme.typography.bodySmall, color = StowInkMutedOnDark)
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("BEST" to "BEST QUALITY", "DATA_SAVER" to "DATA SAVER").forEach { (q, label) ->
+                    FilterChip(
+                        selected = state.qualityPreference == q,
+                        onClick = { viewModel.setQualityPreference(q) },
+                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = chipColors,
+                        border = FilterChipDefaults.filterChipBorder(enabled = true, selected = state.qualityPreference == q, borderColor = StowPineMuted)
+                    )
+                }
             }
-        }
 
-        Spacer(modifier = Modifier.height(20.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = StowPineMuted)
 
-        // Section 4: Engine, Updates & Data
-        SectionLabel("Engine & Maintenance")
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+            Text("File naming", style = MaterialTheme.typography.bodySmall, color = StowInkMutedOnDark)
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("DEFAULT" to "STOW_CODE", "CREATOR_DATE" to "CREATOR_DATE").forEach { (p, label) ->
+                    FilterChip(
+                        selected = state.fileNamingPattern == p,
+                        onClick = { viewModel.setFileNamingPattern(p) },
+                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = chipColors,
+                        border = FilterChipDefaults.filterChipBorder(enabled = true, selected = state.fileNamingPattern == p, borderColor = StowPineMuted)
+                    )
+                }
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = StowPineMuted)
+
+            Text("Gallery subfolder", style = MaterialTheme.typography.bodySmall, color = StowInkMutedOnDark)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = albumDraft,
+                    onValueChange = { albumDraft = it },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = StowInkOnDark,
+                        unfocusedTextColor = StowInkOnDark,
+                        focusedBorderColor = StowLavender,
+                        unfocusedBorderColor = StowPineMuted,
+                        focusedContainerColor = StowPineElevated,
+                        unfocusedContainerColor = StowPineElevated
+                    )
+                )
+                Button(
+                    onClick = { viewModel.setCustomAlbumName(albumDraft) },
+                    enabled = albumDraft.trim() != state.customAlbumName && albumDraft.isNotBlank(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = StowLavender, contentColor = StowPineDark),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                 ) {
-                    OutlinedButton(
-                        onClick = { viewModel.refreshParserConfig() },
-                        enabled = !state.isRefreshingConfig,
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        if (state.isRefreshingConfig) {
-                            CircularProgressIndicator(modifier = Modifier.size(15.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Sync rules", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
-                    }
+                    Text("SAVE", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
 
-                    OutlinedButton(
-                        onClick = { viewModel.checkForUpdate() },
-                        enabled = !state.isCheckingUpdate,
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        if (state.isCheckingUpdate) {
-                            CircularProgressIndicator(modifier = Modifier.size(15.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.SystemUpdate, contentDescription = null, modifier = Modifier.size(16.dp))
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Check updates", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+        // Block 3: Privacy & Biometric Vault
+        StowDarkBlock {
+            SettingsToggleRow(
+                title = "Biometric vault lock",
+                subtitle = "Require fingerprint, face, or PIN to open Library",
+                checked = state.vaultLockEnabled,
+                onCheckedChange = { viewModel.setVaultLockEnabled(it) }
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = StowPineMuted)
+
+            Text(
+                text = "Stow runs 100% on-device with zero ads, zero logins, and zero analytics. Unaffiliated with Meta, X, Reddit, Pinterest, TikTok, or YouTube.",
+                style = MaterialTheme.typography.bodySmall,
+                color = StowInkMutedOnDark
+            )
+        }
+
+        // Block 4: Engine, Updates & Data
+        StowDarkBlock {
+            Text("Engine & maintenance", style = MaterialTheme.typography.titleLarge, color = StowInkOnDark)
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { viewModel.refreshParserConfig() },
+                    enabled = !state.isRefreshingConfig,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, StowPineMuted),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    if (state.isRefreshingConfig) {
+                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = StowLavender)
+                    } else {
+                        Icon(Icons.Default.Refresh, contentDescription = null, tint = StowLavender, modifier = Modifier.size(15.dp))
                     }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("SYNC RULES", style = MaterialTheme.typography.labelSmall, color = StowInkOnDark)
                 }
 
-                state.configRefreshMessage?.let { msg ->
-                    Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { viewModel.checkForUpdate() },
+                    enabled = !state.isCheckingUpdate,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, StowPineMuted),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    if (state.isCheckingUpdate) {
+                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = StowLavender)
+                    } else {
+                        Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = StowLavender, modifier = Modifier.size(15.dp))
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("UPDATES", style = MaterialTheme.typography.labelSmall, color = StowInkOnDark)
+                }
+            }
+
+            state.configRefreshMessage?.let { msg ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = msg,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (state.configRefreshSuccess) SuccessGreenDark else StowInkMutedOnDark
+                )
+            }
+
+            state.updateCheckMessage?.let { msg ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Text(
                         text = msg,
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (state.configRefreshSuccess) successColor else MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (state.updateInfo?.isUpdateAvailable == true) SuccessGreenDark else StowInkMutedOnDark,
+                        modifier = Modifier.weight(1f)
                     )
-                }
-
-                state.updateCheckMessage?.let { msg ->
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = msg,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (state.updateInfo?.isUpdateAvailable == true) successColor else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f)
-                        )
-                        if (state.updateInfo?.isUpdateAvailable == true) {
-                            TextButton(onClick = {
-                                try {
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(state.updateInfo!!.releaseUrl)))
-                                } catch (_: Exception) {}
-                            }) {
-                                Text("Download")
-                            }
+                    if (state.updateInfo?.isUpdateAvailable == true) {
+                        TextButton(onClick = {
+                            try {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(state.updateInfo!!.releaseUrl)))
+                            } catch (_: Exception) {}
+                        }) {
+                            Text("GET", color = StowLavender, style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }
+            }
 
-                HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = MaterialTheme.colorScheme.outline)
+            HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = StowPineMuted)
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Extraction diagnostics", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                        Text("Inspect recent strategy attempts & HTTP codes", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    TextButton(onClick = {
-                        viewModel.refreshDiagnosticLogs()
-                        showDiagnostics = true
-                    }) {
-                        Icon(Icons.Default.BugReport, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("View")
-                    }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Extraction log", style = MaterialTheme.typography.titleMedium, color = StowInkOnDark)
+                    Text("Recent strategy attempts & HTTP codes", style = MaterialTheme.typography.bodySmall, color = StowInkMutedOnDark)
                 }
+                TextButton(onClick = {
+                    viewModel.refreshDiagnosticLogs()
+                    showDiagnostics = true
+                }) {
+                    Icon(Icons.Default.BugReport, contentDescription = null, tint = StowLavender, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("VIEW", color = StowLavender, style = MaterialTheme.typography.labelSmall)
+                }
+            }
 
-                HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = MaterialTheme.colorScheme.outline)
+            HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = StowPineMuted)
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Clear library history", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                        Text("Removes app records only; gallery files stay intact.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    TextButton(onClick = { showClearConfirm = true }) {
-                        Text("Clear", color = MaterialTheme.colorScheme.error)
-                    }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Clear library history", style = MaterialTheme.typography.titleMedium, color = StowInkOnDark)
+                    Text("Gallery files stay intact", style = MaterialTheme.typography.bodySmall, color = StowInkMutedOnDark)
+                }
+                TextButton(onClick = { showClearConfirm = true }) {
+                    Text("CLEAR", color = ErrorRedDark, style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Text(
-            text = "Stow v${state.appVersion}",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.align(Alignment.CenterHorizontally)
-        )
+        Spacer(modifier = Modifier.height(6.dp))
     }
 
     if (showDiagnostics) {
         AlertDialog(
             onDismissRequest = { showDiagnostics = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            title = { Text("Extraction log", style = MaterialTheme.typography.titleLarge) },
+            containerColor = StowPineDark,
+            title = { Text("Extraction log", style = MaterialTheme.typography.titleLarge, color = StowInkOnDark) },
             text = {
                 Column(
                     modifier = Modifier
@@ -401,45 +352,40 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         .verticalScroll(rememberScrollState())
                 ) {
                     if (state.diagnosticLogs.isEmpty()) {
-                        Text(
-                            text = "No extraction activity recorded yet.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Text("No extraction activity recorded yet.", style = MaterialTheme.typography.bodySmall, color = StowInkMutedOnDark)
                     } else {
                         state.diagnosticLogs.forEach { line ->
-                            Text(
-                                text = line,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.padding(vertical = 2.dp)
-                            )
+                            Text(line, style = MaterialTheme.typography.bodySmall, color = StowInkOnDark, modifier = Modifier.padding(vertical = 2.dp))
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showDiagnostics = false }) { Text("Close") }
+                TextButton(onClick = { showDiagnostics = false }) {
+                    Text("CLOSE", color = StowLavender, style = MaterialTheme.typography.labelSmall)
+                }
             },
             dismissButton = {
                 if (state.diagnosticLogs.isNotEmpty()) {
-                    TextButton(onClick = { viewModel.clearDiagnosticLogs() }) { Text("Clear log") }
+                    TextButton(onClick = { viewModel.clearDiagnosticLogs() }) {
+                        Text("CLEAR", color = StowInkMutedOnDark, style = MaterialTheme.typography.labelSmall)
+                    }
                 }
             },
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(22.dp)
         )
     }
 
     if (showClearConfirm) {
         AlertDialog(
             onDismissRequest = { showClearConfirm = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            title = { Text("Clear history?", style = MaterialTheme.typography.titleLarge) },
+            containerColor = StowPineDark,
+            title = { Text("Clear history?", style = MaterialTheme.typography.titleLarge, color = StowInkOnDark) },
             text = {
                 Text(
                     text = "This removes all download records from Stow. Files already saved in your device gallery will not be deleted.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = StowInkMutedOnDark
                 )
             },
             confirmButton = {
@@ -448,20 +394,19 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         viewModel.clearAllData()
                         showClearConfirm = false
                     },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error,
-                        contentColor = MaterialTheme.colorScheme.onError
-                    ),
+                    colors = ButtonDefaults.buttonColors(containerColor = ErrorRedDark, contentColor = StowPineDark),
                     shape = RoundedCornerShape(10.dp),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                 ) {
-                    Text("Clear all")
+                    Text("CLEAR ALL", style = MaterialTheme.typography.labelSmall)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showClearConfirm = false }) { Text("Cancel") }
+                TextButton(onClick = { showClearConfirm = false }) {
+                    Text("CANCEL", color = StowInkMutedOnDark, style = MaterialTheme.typography.labelSmall)
+                }
             },
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(22.dp)
         )
     }
 }
@@ -478,27 +423,20 @@ private fun SettingsToggleRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-            Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text = title, style = MaterialTheme.typography.titleMedium, color = StowInkOnDark)
+            Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = StowInkMutedOnDark)
         }
         Spacer(modifier = Modifier.width(12.dp))
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                checkedTrackColor = MaterialTheme.colorScheme.primary
+                checkedThumbColor = StowPineDark,
+                checkedTrackColor = StowLavender,
+                uncheckedThumbColor = StowInkMutedOnDark,
+                uncheckedTrackColor = StowPineElevated,
+                uncheckedBorderColor = StowPineMuted
             )
         )
     }
-}
-
-@Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text = text.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
-    )
 }
