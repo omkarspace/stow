@@ -19,6 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "CleanSaver"
+rootProject.name = "Stow"
 include(":app")
 

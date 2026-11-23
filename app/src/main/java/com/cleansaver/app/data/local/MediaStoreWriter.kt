@@ -139,7 +139,7 @@ class MediaStoreWriter(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         }
 
-        val album = options.albumName.ifBlank { "CleanSaver" }
+        val album = options.albumName.ifBlank { "Stow" }
         val fileName = buildFileName(candidate, options.fileNamingPattern)
         val relativePath = if (isVideo) "Movies/$album" else "Pictures/$album"
         val mimeType = if (isVideo) "video/mp4" else "image/jpeg"
@@ -271,7 +271,7 @@ class MediaStoreWriter(
             }
             onProgress(tempM4a.length(), tempM4a.length(), 95)
 
-            val album = options.albumName.ifBlank { "CleanSaver" }
+            val album = options.albumName.ifBlank { "Stow" }
             val fileName = buildFileName(candidate, options.fileNamingPattern)
             val contentValues = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
@@ -376,7 +376,7 @@ class MediaStoreWriter(
                 tempVideo
             }
 
-            val album = options.albumName.ifBlank { "CleanSaver" }
+            val album = options.albumName.ifBlank { "Stow" }
             val fileName = buildFileName(candidate, options.fileNamingPattern)
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)

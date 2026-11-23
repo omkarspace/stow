@@ -41,7 +41,7 @@ class AppUpdateChecker(
             val request = Request.Builder()
                 .url(LATEST_RELEASE_API)
                 .header("Accept", "application/vnd.github+json")
-                .header("User-Agent", "CleanSaver-Android")
+                .header("User-Agent", "Stow-Android")
                 .build()
 
             okHttpClient.newCall(request).execute().use { response ->

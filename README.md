@@ -9,7 +9,8 @@
 **Save videos, Reels, Shorts, photos, and MP3/M4A audio from 1,000+ platforms — powered by on-device `yt-dlp` + `FFmpeg`, with zero ads, zero logins, zero tracking, and zero cloud servers.**
 
 [![Latest Release](https://img.shields.io/github/v/release/omkarspace/stow?style=for-the-badge&color=D4CDFF&labelColor=071E1F)](https://github.com/omkarspace/stow/releases/latest)
-[![Android CI](https://img.shields.io/github/actions/workflow/status/omkarspace/stow/android-ci.yml?style=for-the-badge&label=CI&color=7CE3B0&labelColor=071E1F)](https://github.com/omkarspace/stow/actions)
+[![Android CI](https://img.shields.io/github/actions/workflow/status/omkarspace/stow/ci.yml?style=for-the-badge&label=CI&color=7CE3B0&labelColor=071E1F)](https://github.com/omkarspace/stow/actions)
+[![License: MIT](https://img.shields.io/github/license/omkarspace/stow?style=for-the-badge&color=F5F4F0&labelColor=071E1F)](LICENSE)
 [![Downloads](https://img.shields.io/github/downloads/omkarspace/stow/total?style=for-the-badge&color=D4CDFF&labelColor=071E1F)](https://github.com/omkarspace/stow/releases)
 [![Android API](https://img.shields.io/badge/Android-10--15%20(API%2029--35)-F5F4F0?style=for-the-badge&labelColor=071E1F)](https://github.com/omkarspace/stow/releases/latest)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0%20%2B%20Compose-D4CDFF?style=for-the-badge&labelColor=071E1F)](https://kotlinlang.org)

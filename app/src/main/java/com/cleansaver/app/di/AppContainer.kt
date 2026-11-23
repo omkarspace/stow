@@ -35,7 +35,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "cleansaver_prefs")
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "stow_prefs")
 
 class AppContainer(private val context: Context) {
 
@@ -76,7 +76,7 @@ class AppContainer(private val context: Context) {
         Room.databaseBuilder(
             context.applicationContext,
             CleanSaverDatabase::class.java,
-            "cleansaver.db"
+            "stow.db"
         ).fallbackToDestructiveMigration().build()
     }
 

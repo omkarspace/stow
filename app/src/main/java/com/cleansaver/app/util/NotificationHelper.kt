@@ -14,7 +14,7 @@ import com.cleansaver.app.R
 
 object NotificationHelper {
 
-    const val CHANNEL_ID = "cleansaver_downloads"
+    const val CHANNEL_ID = "stow_downloads"
     const val NOTIFICATION_ID = 1001
     const val COMPLETE_NOTIFICATION_ID = 1002
 

@@ -108,7 +108,7 @@ class MultiPlatformExtractor(
 
     private fun extractReddit(parsedUrl: ParsedUrl): Result<List<MediaCandidate>> {
         val jsonUrl = parsedUrl.canonicalUrl.trimEnd('/') + ".json"
-        val request = Request.Builder().url(jsonUrl).header("User-Agent", "CleanSaver/2.0 (Android)").build()
+        val request = Request.Builder().url(jsonUrl).header("User-Agent", "Stow/3.0 (Android)").build()
 
         okHttpClient.newCall(request).execute().use { response ->
             ExtractionLogger.log("REDDIT", "HTTP ${response.code}")

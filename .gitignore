@@ -8,9 +8,16 @@
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
 .DS_Store
+Thumbs.db
 /build
+app/build/
 /captures
 .externalNativeBuild
 .cxx
+.kotlin/
 local.properties
-
+*.keystore
+*.jks
+*.hprof
+.agents/
+.superpowers/

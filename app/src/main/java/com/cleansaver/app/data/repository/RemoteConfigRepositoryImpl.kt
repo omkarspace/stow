@@ -27,9 +27,8 @@ class RemoteConfigRepositoryImpl(
     companion object {
         // High-availability candidate endpoints with automatic fallback
         val CONFIG_URLS = listOf(
-            "https://raw.githubusercontent.com/omkarspace/cleansaver/main/config/config.json",
-            "https://omkarspace.github.io/cleansaver/config/config.json",
-            "https://cleansaver.github.io/config/config.json"
+            "https://raw.githubusercontent.com/omkarspace/stow/main/config/config.json",
+            "https://omkarspace.github.io/stow/config/config.json"
         )
         private const val SUPPORTED_SCHEMA_VERSION = 1
 

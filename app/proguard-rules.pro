@@ -1,4 +1,4 @@
-# ProGuard / R8 Rules for CleanSaver
+# ProGuard / R8 Rules for Stow
 
 # Kotlinx Serialization Rules
 -keepattributes *Annotation*, InnerClasses, EnclosingMethod
