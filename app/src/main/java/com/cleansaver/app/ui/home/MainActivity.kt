@@ -282,7 +282,7 @@ class MainActivity : FragmentActivity() {
             }
         )
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Unlock CleanSaver Library")
+            .setTitle("Unlock Stow Library")
             .setSubtitle("Verify your identity to access saved media")
             .setAllowedAuthenticators(authenticators)
             .build()

@@ -1,2 +1,1 @@
-Ad-free, zero-cost public Reel, video, and post saver for Android. Zero ads, zero tracking.
-
+Minimal, ad-free, on-device media saver for Reels, videos, photos & audio.

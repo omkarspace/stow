@@ -106,7 +106,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
             .padding(horizontal = 20.dp, vertical = 24.dp)
     ) {
         Text(
-            text = "CleanSaver",
+            text = "Stow",
             style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.onBackground
         )
@@ -268,7 +268,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     Text(
                         text = "• Share any public post directly from Instagram, X, Threads, Reddit, or Pinterest.\n" +
                             "• Paste multiple URLs (one per line) to batch-queue.\n" +
-                            "• Add the CleanSaver Quick Settings tile for 1-tap paste.",
+                            "• Add the Stow Quick Settings tile or Home widget for 1-tap paste.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

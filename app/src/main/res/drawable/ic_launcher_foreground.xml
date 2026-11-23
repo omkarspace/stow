@@ -3,10 +3,17 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Minimalist Stow Tray & Downward Arrow -->
     <path
-        android:pathData="M54,32L54,62M42,51L54,63L66,51M37,73L71,73"
+        android:pathData="M54,30L54,58M43,48L54,59L65,48"
         android:strokeColor="#FFFAFAFA"
         android:strokeWidth="5"
         android:strokeLineCap="round"
-        android:strokeLineJoin="round"/>
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M34,58L34,70C34,72.2 35.8,74 38,74L70,74C72.2,74 74,72.2 74,70L74,58"
+        android:strokeColor="#FFFAFAFA"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
 </vector>

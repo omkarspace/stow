@@ -181,7 +181,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 Text("File naming", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("DEFAULT" to "CleanSaver_code", "CREATOR_DATE" to "Creator_Date").forEach { (p, label) ->
+                    listOf("DEFAULT" to "Stow_code", "CREATOR_DATE" to "Creator_Date").forEach { (p, label) ->
                         FilterChip(
                             selected = state.fileNamingPattern == p,
                             onClick = { viewModel.setFileNamingPattern(p) },
@@ -250,7 +250,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = MaterialTheme.colorScheme.outline)
 
                 Text(
-                    text = "CleanSaver runs 100% on-device with zero ads, zero logins, and zero analytics. Unaffiliated with Meta, X, Reddit, or Pinterest. Respect creator rights.",
+                    text = "Stow runs 100% on-device with zero ads, zero logins, and zero analytics. Unaffiliated with Meta, X, Reddit, Pinterest, TikTok, or YouTube. Respect creator rights.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -381,7 +381,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(
-            text = "CleanSaver v${state.appVersion}",
+            text = "Stow v${state.appVersion}",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -437,7 +437,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             title = { Text("Clear history?", style = MaterialTheme.typography.titleLarge) },
             text = {
                 Text(
-                    text = "This removes all download records from CleanSaver. Files already saved in your device gallery will not be deleted.",
+                    text = "This removes all download records from Stow. Files already saved in your device gallery will not be deleted.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -35,7 +35,7 @@ fun DisclaimerBottomSheet(
                 .padding(horizontal = 24.dp, vertical = 12.dp)
         ) {
             Text(
-                text = "Welcome to CleanSaver",
+                text = "Welcome to Stow",
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -43,7 +43,7 @@ fun DisclaimerBottomSheet(
             Spacer(modifier = Modifier.height(10.dp))
 
             Text(
-                text = "A minimal, on-device utility for saving public Instagram media.",
+                text = "A minimal, on-device utility for saving public media cleanly.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -53,7 +53,7 @@ fun DisclaimerBottomSheet(
             Text(
                 text = "• 100% on-device — no backend servers or proxies.\n" +
                     "• Zero ads, zero logins, and zero analytics.\n" +
-                    "• Independent utility unaffiliated with Meta or Instagram. Respect creator rights and fair-use guidelines.",
+                    "• Independent utility unaffiliated with Meta, X, Reddit, Pinterest, TikTok, or YouTube. Respect creator rights.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

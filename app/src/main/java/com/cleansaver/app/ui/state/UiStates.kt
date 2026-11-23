@@ -58,7 +58,7 @@ data class SettingsUiState(
     val vaultLockEnabled: Boolean = false,
     val qualityPreference: String = "BEST",
     val fileNamingPattern: String = "DEFAULT",
-    val customAlbumName: String = "CleanSaver",
+    val customAlbumName: String = "Stow",
     val isLoaded: Boolean = false,
     val isRefreshingConfig: Boolean = false,
     val configRefreshMessage: String? = null,

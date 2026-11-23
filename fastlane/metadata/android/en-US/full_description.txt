@@ -1,14 +1,11 @@
-CleanSaver is an open-source, utility-first Android application that saves public Instagram Reels, photos, and carousels directly to your local gallery with zero friction.
+Stow is a minimal, open-source, 100% on-device Android utility that saves public videos, Reels, photos, carousels, and audio directly to your device with zero ads, zero logins, and zero tracking.
 
 Key Features:
-- Zero ads · Zero paywalls · Zero logins · Zero telemetry.
-- 100% On-Device: All requests run directly from your phone to public endpoints. No proxy or middleman servers.
-- Share Sheet Integration: Share any Reel or Post directly from Instagram and save with 1 tap.
-- Batch Carousel Downloads: Save multi-slide carousels with individual slide selection or batch saving.
-- In-App Full-Screen Player: Loop reels in full-screen before or after saving.
-- Scoped Storage Native: Saves directly to Movies/CleanSaver and Pictures/CleanSaver without requesting broad storage permissions.
-- Local Library: Filter saved items by Reels or Photos, open in default viewers, or share.
-- Dynamic Parser Resilience: Auto-syncs extraction rules so saves keep working seamlessly.
+- Multi-Platform: Save public media from Instagram, Threads, X (Twitter), Reddit (with native DASH audio muxing), Pinterest, TikTok, and YouTube Shorts.
+- Native Audio Extraction: Extract .m4a audio tracks directly on-device using Android MediaExtractor & MediaMuxer with zero FFmpeg bloat.
+- Caption & Hashtags: Copy captions and hashtags in 1 tap and search your saved Library by caption or @creator.
+- Instant Share & Batch Queue: Share directly from any app for 1-tap saving, paste multiple links at once, or use the Quick Settings tile and Home Screen widget.
+- Smart Library & Biometric Vault: Organize with Favorites, custom tags, sorting, bulk actions, and optional BiometricPrompt vault lock.
+- Privacy First: 100% on-device. No backend servers, no analytics, no logins.
 
-CleanSaver is an independent utility unaffiliated with Meta or Instagram. Users are responsible for respecting creator rights and fair-use guidelines.
-
+Stow is an independent utility unaffiliated with Meta, X, Reddit, Pinterest, TikTok, or YouTube. Users are responsible for respecting creator rights and fair-use guidelines.

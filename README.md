@@ -1,30 +1,21 @@
-# CleanSaver
+# Stow
 
-**Ad-Free, Zero-Cost Public Reel & Post Saver for Android.**
+**Minimal, ad-free, 100% on-device media saver for Android.**
 
-CleanSaver is an open-source, utility-first Android application that saves public Instagram Reels, photos, and carousels directly to the local gallery — with zero friction.
+Stow saves public videos, Reels, photos, carousels, and `.m4a` audio directly to your Android gallery — with zero ads, zero logins, zero backend servers, and zero analytics.
 
-- **Zero ads · Zero paywalls · Zero logins · Zero telemetry**
-- **100% on-device parsing** — all network requests run directly from the user's phone
-- **₹0/month running cost** — no backend servers; parser rules live on free static hosting
-- **<5 MB APK** — native Kotlin + Jetpack Compose
+## Features
+- **Multi-Platform:** Instagram, Threads, X (Twitter), Reddit (with native DASH audio muxing), Pinterest, TikTok, and YouTube Shorts.
+- **Native Audio Extraction:** Extract standalone `.m4a` audio from videos using Android's `MediaExtractor` + `MediaMuxer` (0 MB FFmpeg overhead).
+- **Caption & Creator Metadata:** Copy captions/hashtags in 1 tap and search your Library by caption, `@creator`, or `#tag`.
+- **Zero-Friction Workflows:** 1-tap Instant Share Save, multi-line Batch Queue, Quick Settings Tile, and Home Screen Widget.
+- **Smart Library & Vault:** Visual 2-column grid with video thumbnails, Favorites, custom collection tags, sorting, storage breakdown, bulk share/delete, and optional Biometric Vault lock.
+- **Power-User Controls:** Custom file naming (`Stow_code` / `Creator_Date`), custom Gallery subfolder, Best vs Data Saver quality preference, Wi-Fi-only guard, extraction diagnostics log, and GitHub Releases update checker.
 
-## Documentation
-
-| Document | Path |
-| :---- | :---- |
-| Product Requirements (PRD) | [`docs/PRD — CleanSaver (Ad-Free, Zero-Cost Public Reel & Post Saver).md`](docs/) |
-| High-Level Design (HLD) | [`docs/HLD — CleanSaver (System & Android High-Level Design).md`](docs/) |
-| Low-Level Design (LLD) | [`docs/LLD — CleanSaver (Kotlin Interfaces, Schemas & Implementation Spec).md`](docs/) |
-
-## Status
-
-v1.0 MVP specification — ready for engineering. See the "Open Implementation Gaps" appendix in the LLD for known spec gaps.
+## Architecture & Docs
+- **Tech Stack:** Kotlin 2.0, Jetpack Compose (Material 3), OkHttp 4, Kotlinx Serialization, Room, DataStore, Coil + `coil-video`, WorkManager, AndroidX Biometric.
+- **Target:** Android 10–15 (API 29–35).
+- See [`TODO.md`](TODO.md) and [`docs/`](docs/) for the full design specs and checklist.
 
 ## Disclaimer
-
-CleanSaver is an independent utility application for saving personal media and is not affiliated with, endorsed by, or associated with Meta or Instagram. Users bear sole responsibility for ensuring saved media complies with original creator rights and personal fair-use standards.
-
-## License
-
-TBD.
+Stow is an independent open-source utility unaffiliated with Meta, X, Reddit, Pinterest, TikTok, or YouTube. Users are responsible for respecting creator rights and fair-use guidelines.

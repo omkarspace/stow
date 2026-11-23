@@ -42,13 +42,13 @@ class FeatureUtilsTest {
             creatorHandle = "natgeo",
             platform = Platform.INSTAGRAM
         )
-        assertEquals("CleanSaver_XYZ789_0.mp4", MediaStoreWriter.buildFileName(video, "DEFAULT"))
+        assertEquals("Stow_XYZ789_0.mp4", MediaStoreWriter.buildFileName(video, "DEFAULT"))
         val creatorName = MediaStoreWriter.buildFileName(video, "CREATOR_DATE")
         assertTrue(creatorName.startsWith("natgeo_"))
         assertTrue(creatorName.endsWith("_XYZ789_0.mp4"))
 
         val audio = video.copy(mediaType = MediaType.AUDIO)
-        assertEquals("CleanSaver_XYZ789_0.m4a", MediaStoreWriter.buildFileName(audio, "DEFAULT"))
+        assertEquals("Stow_XYZ789_0.m4a", MediaStoreWriter.buildFileName(audio, "DEFAULT"))
     }
 }
 

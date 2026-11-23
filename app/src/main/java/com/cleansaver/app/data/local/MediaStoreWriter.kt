@@ -29,7 +29,7 @@ data class SavedFileMeta(val mediaStoreUri: String, val fileName: String, val fi
 data class SaveOptions(
     val wifiOnly: Boolean = false,
     val fileNamingPattern: String = "DEFAULT", // "DEFAULT" | "CREATOR_DATE"
-    val albumName: String = "CleanSaver"
+    val albumName: String = "Stow"
 )
 
 class MediaStoreWriter(
@@ -55,7 +55,7 @@ class MediaStoreWriter(
                 val date = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
                 return "${creator}_${date}_${candidate.shortcode}_${candidate.slideIndex}.$extension"
             }
-            return "CleanSaver_${candidate.shortcode}_${candidate.slideIndex}.$extension"
+            return "Stow_${candidate.shortcode}_${candidate.slideIndex}.$extension"
         }
     }
 

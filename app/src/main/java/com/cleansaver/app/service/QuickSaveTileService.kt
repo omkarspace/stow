@@ -12,7 +12,7 @@ class QuickSaveTileService : TileService() {
     override fun onStartListening() {
         super.onStartListening()
         qsTile?.apply {
-            label = "CleanSaver"
+            label = "Stow"
             state = Tile.STATE_INACTIVE
             updateTile()
         }

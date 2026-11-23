@@ -33,7 +33,7 @@ class UserPrefsRepositoryImpl(
     override val vaultLockEnabled: Flow<Boolean> = dataStore.data.map { it[KEY_VAULT_LOCK] ?: false }
     override val qualityPreference: Flow<String> = dataStore.data.map { it[KEY_QUALITY_PREF] ?: "BEST" }
     override val fileNamingPattern: Flow<String> = dataStore.data.map { it[KEY_FILE_NAMING] ?: "DEFAULT" }
-    override val customAlbumName: Flow<String> = dataStore.data.map { it[KEY_CUSTOM_ALBUM] ?: "CleanSaver" }
+    override val customAlbumName: Flow<String> = dataStore.data.map { it[KEY_CUSTOM_ALBUM] ?: "Stow" }
 
     override suspend fun setThemeMode(mode: String) {
         dataStore.edit { it[KEY_THEME_MODE] = mode }
@@ -68,7 +68,7 @@ class UserPrefsRepositoryImpl(
     }
 
     override suspend fun setCustomAlbumName(albumName: String) {
-        val sanitized = albumName.trim().replace(Regex("[^A-Za-z0-9 _-]"), "").ifBlank { "CleanSaver" }
+        val sanitized = albumName.trim().replace(Regex("[^A-Za-z0-9 _-]"), "").ifBlank { "Stow" }
         dataStore.edit { it[KEY_CUSTOM_ALBUM] = sanitized }
     }
 }

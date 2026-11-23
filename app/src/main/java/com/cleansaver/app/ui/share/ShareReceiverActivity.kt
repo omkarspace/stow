@@ -118,7 +118,7 @@ fun ShareReceiverSheet(
                 .padding(horizontal = 24.dp, vertical = 12.dp)
         ) {
             Text(
-                text = "CleanSaver",
+                text = "Stow",
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )

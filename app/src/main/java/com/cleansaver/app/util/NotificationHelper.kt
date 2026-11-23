@@ -31,7 +31,7 @@ object NotificationHelper {
         createNotificationChannel(context)
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle("CleanSaver")
+            .setContentTitle("Stow")
             .setContentText(progressText)
             .setSmallIcon(R.drawable.ic_notification)
             .setOngoing(true)

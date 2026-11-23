@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">CleanSaver</string>
+    <string name="app_name">Stow</string>
     <string name="paste_link">Paste Link</string>
     <string name="download">Download</string>
     <string name="saving_to_gallery">Saving to Gallery…</string>
