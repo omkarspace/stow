@@ -72,6 +72,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -82,6 +84,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.cleansaver.app.data.engine.QueueTaskStatus
+import com.cleansaver.app.data.local.DownloadedMediaEntity
 import com.cleansaver.app.domain.model.AppError
 import com.cleansaver.app.domain.model.DownloadProgress
 import com.cleansaver.app.domain.model.MediaCandidate
@@ -89,11 +92,13 @@ import com.cleansaver.app.domain.model.MediaType
 import com.cleansaver.app.ui.components.FormatPickerBottomSheet
 import com.cleansaver.app.ui.components.MediaPreviewDialog
 import com.cleansaver.app.ui.components.StowActionButton
+import com.cleansaver.app.ui.components.StowCanvasHeader
 import com.cleansaver.app.ui.components.StowDarkBadge
 import com.cleansaver.app.ui.components.StowDarkBlock
 import com.cleansaver.app.ui.components.StowExtractionShimmerBlock
 import com.cleansaver.app.ui.components.StowLavenderBadge
 import com.cleansaver.app.ui.components.StowSegmentedProgressBar
+import com.cleansaver.app.ui.library.LibraryViewModel
 import com.cleansaver.app.ui.theme.ErrorRedDark
 import com.cleansaver.app.ui.theme.StowInkMutedOnDark
 import com.cleansaver.app.ui.theme.StowInkOnDark
@@ -107,13 +112,16 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
+    libraryViewModel: LibraryViewModel,
     snackbarHostState: SnackbarHostState,
     clipboardSuggestion: String? = null,
     onUseClipboardSuggestion: (String) -> Unit = {},
     onDismissClipboardSuggestion: () -> Unit = {},
-    onOpenQueue: () -> Unit = {}
+    onOpenQueue: () -> Unit = {},
+    onOpenLibrary: () -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
+    val libraryState by libraryViewModel.uiState.collectAsState()
     val queueTasks by viewModel.queueTasks.collectAsState()
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
@@ -126,7 +134,10 @@ fun HomeScreen(
         }
     }
 
+    val detectedPlatform = remember(state.inputUrl) { detectPlatformLabel(state.inputUrl) }
+
     var previewCandidate by remember { mutableStateOf<MediaCandidate?>(null) }
+    var previewRecentItem by remember { mutableStateOf<DownloadedMediaEntity?>(null) }
 
     LaunchedEffect(state.actionBannerMessage) {
         state.actionBannerMessage?.let { msg ->
@@ -149,21 +160,12 @@ fun HomeScreen(
             .padding(horizontal = 16.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // 1. Lightweight Canvas-Direct Swiss Top Header (Concept A)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 2.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "STOW®",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            StowLavenderBadge(text = "YT-DLP · 1000+")
-        }
+        // 1. Lightweight Canvas-Direct Swiss Top Header with Micro-Reel Brand Mark
+        StowCanvasHeader(
+            title = "STOW®",
+            badgeText = "YT-DLP · 1000+",
+            showBrandMark = true
+        )
 
         // 2. Smart Clipboard Detection Pill
         AnimatedVisibility(
@@ -175,6 +177,7 @@ fun HomeScreen(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp))
                         .clickable {
                             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onUseClipboardSuggestion(clipUrl)
@@ -202,7 +205,7 @@ fun HomeScreen(
                             Text(
                                 text = clipUrl,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = StowPineDark.copy(alpha = 0.75f),
+                                color = StowPineDark.copy(alpha = 0.78f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -215,7 +218,7 @@ fun HomeScreen(
             }
         }
 
-        // 3. Single Hero Dark Modular Block (Concept A)
+        // 3. Single Hero Dark Modular Block
         StowDarkBlock {
             Text(
                 text = "Save anything,\nanywhere.",
@@ -294,9 +297,29 @@ fun HomeScreen(
                     unfocusedContainerColor = StowPineElevated
                 )
             )
+
+            // Live Platform Detection Pill inside Hero Block
+            AnimatedVisibility(visible = detectedPlatform != null) {
+                detectedPlatform?.let { platform ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        StowLavenderBadge(text = platform)
+                        Text(
+                            text = "Ready to fetch formats",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = StowInkMutedOnDark
+                        )
+                    }
+                }
+            }
         }
 
-        // 4. Light-Canvas Contrast Action Strip (Concept A)
+        // 4. Light-Canvas Contrast Action Strip
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -320,12 +343,13 @@ fun HomeScreen(
             Spacer(modifier = Modifier.width(12.dp))
 
             StowActionButton(
-                text = if (state.isValidating || state.isExtracting) "Working" else "Fetch",
+                text = if (state.isValidating || state.isExtracting) "Fetching" else "Fetch",
                 onClick = {
                     keyboard?.hide()
                     viewModel.onExtract()
                 },
-                enabled = state.inputUrl.isNotBlank() && !state.isValidating && !state.isExtracting
+                enabled = state.inputUrl.isNotBlank(),
+                isLoading = state.isValidating || state.isExtracting
             )
         }
 
@@ -402,7 +426,7 @@ fun HomeScreen(
                             )
                         }
                         TextButton(onClick = onOpenQueue) {
-                            Text("QUEUE", color = StowLavender, style = MaterialTheme.typography.labelSmall)
+                            Text("QUEUE →", color = StowLavender, style = MaterialTheme.typography.labelSmall)
                         }
                     }
                     Spacer(modifier = Modifier.height(12.dp))
@@ -411,7 +435,141 @@ fun HomeScreen(
             }
         }
 
-        // 6. Legacy Photo / Carousel Fallback Preview (only when yt-dlp falls back for IG photos)
+        // 6. Lightweight Canvas-Direct "Recently Stowed" 3-Tile Strip (Zero Heavy Box Clutter)
+        if (state.extractedCandidates.isEmpty() && !state.isExtracting && !state.isValidating) {
+            val recents = libraryState.items.take(3)
+            if (recents.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "RECENTLY STOWED",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                        )
+                        Text(
+                            text = "LIBRARY (${libraryState.totalCount}) →",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable(onClick = onOpenLibrary)
+                                .padding(horizontal = 6.dp, vertical = 4.dp)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        recents.forEach { item ->
+                            val isAudio = item.mediaType == "AUDIO"
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .aspectRatio(4f / 5f)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .clickable {
+                                        if (isAudio) {
+                                            try {
+                                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                                    setDataAndType(Uri.parse(item.mediaStoreUri), "audio/*")
+                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                }
+                                                context.startActivity(intent)
+                                            } catch (_: Exception) {}
+                                        } else {
+                                            previewRecentItem = item
+                                        }
+                                    },
+                                shape = RoundedCornerShape(16.dp),
+                                color = StowPineElevated
+                            ) {
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    if (isAudio) {
+                                        Icon(
+                                            imageVector = Icons.Default.AudioFile,
+                                            contentDescription = item.title,
+                                            tint = StowLavender,
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .align(Alignment.Center)
+                                        )
+                                    } else {
+                                        AsyncImage(
+                                            model = Uri.parse(item.mediaStoreUri),
+                                            contentDescription = item.title,
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(54.dp)
+                                            .align(Alignment.BottomCenter)
+                                            .background(
+                                                Brush.verticalGradient(
+                                                    listOf(Color.Transparent, StowPineDark.copy(alpha = 0.9f))
+                                                )
+                                            )
+                                    )
+                                    Text(
+                                        text = item.title.ifBlank { item.fileName.substringBeforeLast('.') },
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = StowInkOnDark,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier
+                                            .align(Alignment.BottomStart)
+                                            .padding(horizontal = 8.dp, vertical = 7.dp)
+                                    )
+                                }
+                            }
+                        }
+                        repeat((3 - recents.size).coerceAtLeast(0)) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            } else {
+                // Clean, breathable capability pills on first launch
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf("UP TO 4K MP4", "MP3 / M4A AUDIO", "ZERO ADS").forEach { tag ->
+                        Surface(
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color.Transparent,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.14f))
+                        ) {
+                            Box(
+                                modifier = Modifier.padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = tag,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 7. Legacy Photo / Carousel Fallback Preview
         AnimatedVisibility(
             visible = state.extractedCandidates.isNotEmpty(),
             enter = fadeIn() + expandVertically(),
@@ -639,7 +797,8 @@ fun HomeScreen(
                     StowActionButton(
                         text = if (state.isDownloading) "Saving" else "Save",
                         onClick = { viewModel.onDownload(force = false) },
-                        enabled = state.selectedIndices.isNotEmpty() && !state.isDownloading
+                        enabled = state.selectedIndices.isNotEmpty(),
+                        isLoading = state.isDownloading
                     )
                 }
             }
@@ -663,6 +822,15 @@ fun HomeScreen(
             isVideo = candidate.mediaType == MediaType.VIDEO,
             title = if (candidate.mediaType == MediaType.VIDEO) "Video Preview" else "Photo Preview",
             onDismiss = { previewCandidate = null }
+        )
+    }
+
+    previewRecentItem?.let { item ->
+        MediaPreviewDialog(
+            mediaUriOrUrl = item.mediaStoreUri,
+            isVideo = item.mediaType == "VIDEO",
+            title = item.title.ifBlank { item.fileName },
+            onDismiss = { previewRecentItem = null }
         )
     }
 
@@ -695,6 +863,29 @@ fun HomeScreen(
             },
             shape = RoundedCornerShape(22.dp)
         )
+    }
+}
+
+private fun detectPlatformLabel(raw: String): String? {
+    val trimmed = raw.trim()
+    if (!trimmed.contains("http://", ignoreCase = true) && !trimmed.contains("https://", ignoreCase = true)) {
+        return null
+    }
+    val urls = Regex("""https?://\S+""", RegexOption.IGNORE_CASE).findAll(trimmed).count()
+    if (urls > 1) return "BATCH · $urls LINKS"
+    return when {
+        trimmed.contains("youtube.com", true) || trimmed.contains("youtu.be", true) -> "YOUTUBE"
+        trimmed.contains("instagram.com", true) || trimmed.contains("instagr.am", true) -> "INSTAGRAM"
+        trimmed.contains("tiktok.com", true) -> "TIKTOK"
+        trimmed.contains("x.com", true) || trimmed.contains("twitter.com", true) -> "X / TWITTER"
+        trimmed.contains("reddit.com", true) || trimmed.contains("redd.it", true) -> "REDDIT"
+        trimmed.contains("threads.net", true) || trimmed.contains("threads.com", true) -> "THREADS"
+        trimmed.contains("pinterest.", true) || trimmed.contains("pin.it", true) -> "PINTEREST"
+        trimmed.contains("soundcloud.com", true) -> "SOUNDCLOUD"
+        trimmed.contains("twitch.tv", true) -> "TWITCH"
+        trimmed.contains("vimeo.com", true) -> "VIMEO"
+        trimmed.contains("facebook.com", true) || trimmed.contains("fb.watch", true) -> "FACEBOOK"
+        else -> "WEB LINK"
     }
 }
 

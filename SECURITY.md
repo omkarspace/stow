@@ -22,3 +22,4 @@ If you discover a security issue (such as intent hijacking, path traversal in fi
 1. **Do not** open a public GitHub issue with exploit details.
 2. Use GitHub's **Security Advisories** (*Security → Report a vulnerability*) on [omkarspace/stow](https://github.com/omkarspace/stow/security).
 3. Include steps to reproduce, affected version, and suggested mitigation if known.
+

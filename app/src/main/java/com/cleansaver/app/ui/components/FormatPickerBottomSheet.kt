@@ -1,5 +1,7 @@
 package com.cleansaver.app.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -8,15 +10,26 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AudioFile
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -72,16 +85,17 @@ fun FormatPickerBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 22.dp, vertical = 10.dp)
+                .navigationBarsPadding()
+                .padding(horizontal = 22.dp, vertical = 8.dp)
         ) {
-            // Media Preview Header
+            // Media Preview Header with overlaid duration pill
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
-                        .size(66.dp)
+                        .size(72.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(StowPineElevated)
                 ) {
@@ -89,13 +103,32 @@ fun FormatPickerBottomSheet(
                         AsyncImage(
                             model = thumb,
                             contentDescription = mediaInfo.title,
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
                         )
+                    }
+                    val dur = mediaInfo.formattedDuration()
+                    if (dur.isNotBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = StowPineDark.copy(alpha = 0.85f),
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(4.dp)
+                        ) {
+                            Text(
+                                text = dur,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = StowInkOnDark,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
+                    StowLavenderBadge(text = mediaInfo.platform.ifBlank { "MEDIA" })
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = mediaInfo.title,
                         style = MaterialTheme.typography.titleMedium,
@@ -103,52 +136,72 @@ fun FormatPickerBottomSheet(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    val dur = mediaInfo.formattedDuration()
-                    val meta = listOfNotNull(
-                        mediaInfo.creator.takeIf { it.isNotBlank() }?.let { "@$it" },
-                        dur.takeIf { it.isNotBlank() },
-                        mediaInfo.platform
-                    ).joinToString(" · ")
-                    Text(
-                        text = meta,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = StowInkMutedOnDark,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    if (mediaInfo.creator.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "@${mediaInfo.creator}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = StowInkMutedOnDark,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             // VIDEO / AUDIO Segmented Switcher
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = StowPineElevated,
+                border = BorderStroke(1.dp, StowPineMuted)
             ) {
-                listOf(0 to "VIDEO", 1 to "AUDIO").forEach { (idx, label) ->
-                    val selected = activeTab == idx
-                    Surface(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable {
-                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                activeTab = idx
-                            },
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (selected) StowLavender else StowPineElevated
-                    ) {
-                        Box(
-                            modifier = Modifier.padding(vertical = 10.dp),
-                            contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf(
+                        Triple(0, "VIDEO", Icons.Default.Videocam),
+                        Triple(1, "AUDIO", Icons.Default.AudioFile)
+                    ).forEach { (idx, label, icon) ->
+                        val selected = activeTab == idx
+                        val bg by animateColorAsState(
+                            targetValue = if (selected) StowLavender else StowPineElevated,
+                            animationSpec = tween(180),
+                            label = "tab_bg_$idx"
+                        )
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    activeTab = idx
+                                },
+                            shape = RoundedCornerShape(10.dp),
+                            color = bg
                         ) {
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (selected) StowPineDark else StowInkMutedOnDark
-                            )
+                            Row(
+                                modifier = Modifier.padding(vertical = 10.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = null,
+                                    tint = if (selected) StowPineDark else StowInkMutedOnDark,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (selected) StowPineDark else StowInkMutedOnDark
+                                )
+                            }
                         }
                     }
                 }
@@ -156,39 +209,62 @@ fun FormatPickerBottomSheet(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Selectable Format & File Size Pills
-            options.forEach { option ->
-                val isSelected = selectedFormat?.id == option.id
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .clickable {
-                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            selectedFormat = option
-                        },
-                    shape = RoundedCornerShape(14.dp),
-                    color = if (isSelected) StowLavender else StowPineElevated,
-                    border = if (isSelected) null else BorderStroke(1.dp, StowPineMuted)
-                ) {
-                    Row(
+            // Scrollable Format & File Size Pills
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 230.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                options.forEach { option ->
+                    val isSelected = selectedFormat?.id == option.id
+                    val cardBg by animateColorAsState(
+                        targetValue = if (isSelected) StowLavender else StowPineElevated,
+                        animationSpec = tween(160),
+                        label = "opt_bg_${option.id}"
+                    )
+                    Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable {
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                selectedFormat = option
+                            },
+                        shape = RoundedCornerShape(14.dp),
+                        color = cardBg,
+                        border = if (isSelected) null else BorderStroke(1.dp, StowPineMuted)
                     ) {
-                        Text(
-                            text = option.label,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = if (isSelected) StowPineDark else StowInkOnDark
-                        )
-                        Text(
-                            text = option.sizeLabel,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (isSelected) StowPineDark else StowInkMutedOnDark
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 13.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = StowPineDark,
+                                        modifier = Modifier.size(17.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                                Text(
+                                    text = option.label,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = if (isSelected) StowPineDark else StowInkOnDark
+                                )
+                            }
+                            Text(
+                                text = option.sizeLabel,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (isSelected) StowPineDark else StowInkMutedOnDark
+                            )
+                        }
                     }
                 }
             }
@@ -201,17 +277,23 @@ fun FormatPickerBottomSheet(
                     TogglePill(
                         label = "Subtitles",
                         checked = embedSubtitles,
-                        onClick = { embedSubtitles = !embedSubtitles }
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            embedSubtitles = !embedSubtitles
+                        }
                     )
                 }
                 TogglePill(
                     label = "Embed cover",
                     checked = embedThumbnail,
-                    onClick = { embedThumbnail = !embedThumbnail }
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        embedThumbnail = !embedThumbnail
+                    }
                 )
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             Button(
                 onClick = {
@@ -230,10 +312,15 @@ fun FormatPickerBottomSheet(
                 ),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
             ) {
-                Text("DOWNLOAD NOW", style = MaterialTheme.typography.labelLarge)
+                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = selectedFormat?.let { "DOWNLOAD · ${it.label.substringBefore(" · ")}" } ?: "DOWNLOAD NOW",
+                    style = MaterialTheme.typography.labelLarge
+                )
             }
 
-            Spacer(modifier = Modifier.height(22.dp))
+            Spacer(modifier = Modifier.height(14.dp))
         }
     }
 }
@@ -256,8 +343,7 @@ private fun TogglePill(
             text = if (checked) "✓ $label" else label,
             style = MaterialTheme.typography.labelSmall,
             color = if (checked) StowLavender else StowInkMutedOnDark,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+            modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp)
         )
     }
 }
-

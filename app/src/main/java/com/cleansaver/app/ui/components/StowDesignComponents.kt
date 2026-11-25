@@ -10,6 +10,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -23,10 +25,12 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -44,15 +48,66 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cleansaver.app.R
 import com.cleansaver.app.ui.theme.StowInkMutedOnDark
 import com.cleansaver.app.ui.theme.StowInkOnDark
 import com.cleansaver.app.ui.theme.StowLavender
 import com.cleansaver.app.ui.theme.StowPineDark
 import com.cleansaver.app.ui.theme.StowPineElevated
 import com.cleansaver.app.ui.theme.StowPineMuted
+
+@Composable
+fun StowCanvasHeader(
+    title: String,
+    badgeText: String,
+    showBrandMark: Boolean = false,
+    trailingAction: (@Composable () -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 2.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (showBrandMark) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = StowPineDark,
+                    modifier = Modifier.size(30.dp)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                        contentDescription = "Stow",
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = (-0.5).sp
+                ),
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            trailingAction?.invoke()
+            StowLavenderBadge(text = badgeText)
+        }
+    }
+}
 
 @Composable
 fun StowTopBarBlock(
@@ -62,7 +117,8 @@ fun StowTopBarBlock(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(26.dp),
-        color = MaterialTheme.colorScheme.surface
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, StowPineMuted.copy(alpha = 0.5f))
     ) {
         Row(
             modifier = Modifier
@@ -91,11 +147,12 @@ fun StowDarkBlock(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surface
+        shape = RoundedCornerShape(26.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, StowPineMuted.copy(alpha = 0.55f))
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 22.dp, vertical = 20.dp),
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp),
             content = content
         )
     }
@@ -108,7 +165,7 @@ fun StowLavenderBadge(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(9.dp),
         color = StowLavender
     ) {
         Text(
@@ -127,7 +184,7 @@ fun StowDarkBadge(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(6.dp),
+        shape = RoundedCornerShape(7.dp),
         color = StowPineDark
     ) {
         Text(
@@ -180,7 +237,7 @@ fun StowSegmentedProgressBar(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(28.dp)
+                        .height(26.dp)
                         .clip(RoundedCornerShape(4.dp))
                         .background(segColor)
                 )
@@ -233,7 +290,7 @@ fun StowExtractionShimmerBlock(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(18.dp))
+                .clip(RoundedCornerShape(16.dp))
                 .background(shimmerBrush)
         )
         Spacer(modifier = Modifier.height(12.dp))
@@ -264,8 +321,9 @@ fun StowStatTile(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(26.dp),
-        color = MaterialTheme.colorScheme.surface
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, StowPineMuted.copy(alpha = 0.5f))
     ) {
         Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
             Text(
@@ -291,20 +349,21 @@ fun StowStatTile(
 }
 
 /**
- * Tactile spring-bounce CTA button with haptic tick.
+ * Tactile spring-bounce CTA button with haptic tick and optional loading spinner.
  */
 @Composable
 fun StowActionButton(
     text: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
+    isLoading: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalHapticFeedback.current
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (pressed && enabled) 0.95f else 1f,
+        targetValue = if (pressed && enabled && !isLoading) 0.95f else 1f,
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
         label = "btn_scale"
     )
@@ -314,7 +373,7 @@ fun StowActionButton(
             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             onClick()
         },
-        enabled = enabled,
+        enabled = enabled && !isLoading,
         interactionSource = interactionSource,
         modifier = modifier
             .scale(scale)
@@ -328,6 +387,14 @@ fun StowActionButton(
         ),
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
     ) {
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+                color = StowLavender
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+        }
         Text(
             text = text.uppercase(),
             style = MaterialTheme.typography.labelLarge
@@ -350,7 +417,8 @@ fun StowFloatingSnackbarHost(
         Surface(
             shape = RoundedCornerShape(18.dp),
             color = StowPineDark,
-            shadowElevation = 6.dp
+            border = BorderStroke(1.dp, StowPineMuted),
+            shadowElevation = 8.dp
         ) {
             Row(
                 modifier = Modifier

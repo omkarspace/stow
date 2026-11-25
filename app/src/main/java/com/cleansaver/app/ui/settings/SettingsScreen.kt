@@ -50,8 +50,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.cleansaver.app.ui.components.StowCanvasHeader
 import com.cleansaver.app.ui.components.StowDarkBlock
-import com.cleansaver.app.ui.components.StowLavenderBadge
 import com.cleansaver.app.ui.library.LibraryViewModel
 import com.cleansaver.app.ui.theme.ErrorRedDark
 import com.cleansaver.app.ui.theme.StowInkMutedOnDark
@@ -93,20 +93,10 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Lightweight Canvas-Direct Swiss Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 2.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "SETTINGS",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            StowLavenderBadge(text = "V${state.appVersion}")
-        }
+        StowCanvasHeader(
+            title = "SETTINGS",
+            badgeText = "V${state.appVersion}"
+        )
 
         // Block 1: Appearance & Automation
         StowDarkBlock {
@@ -419,7 +409,33 @@ fun SettingsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        // Open-Source Footer
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "STOW® · 100% ON-DEVICE · MIT",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
+            )
+            TextButton(
+                onClick = {
+                    try {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/omkarspace/stow")))
+                    } catch (_: Exception) {}
+                }
+            ) {
+                Text(
+                    text = "GITHUB →",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
+        }
     }
 
     if (showDiagnostics) {

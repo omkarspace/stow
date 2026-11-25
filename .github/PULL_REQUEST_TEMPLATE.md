@@ -6,3 +6,4 @@ Briefly describe what this PR changes and why.
 - [ ] No ads, analytics, or external backend dependencies introduced
 - [ ] UI follows Stow's Neo-Swiss design language (if UI changes)
 - [ ] Screenshots attached (if UI changes)
+

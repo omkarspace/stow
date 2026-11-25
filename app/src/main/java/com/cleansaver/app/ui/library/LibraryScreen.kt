@@ -1,10 +1,14 @@
 package com.cleansaver.app.ui.library
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -17,8 +21,10 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -31,13 +37,18 @@ import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -46,9 +57,11 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SnackbarDuration
@@ -58,6 +71,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -68,8 +82,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -80,6 +96,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.cleansaver.app.data.local.DownloadedMediaEntity
 import com.cleansaver.app.ui.components.MediaPreviewDialog
+import com.cleansaver.app.ui.components.StowCanvasHeader
 import com.cleansaver.app.ui.components.StowDarkBlock
 import com.cleansaver.app.ui.components.StowLavenderBadge
 import com.cleansaver.app.ui.home.formatBytes
@@ -105,6 +122,7 @@ fun LibraryScreen(
     val scope = rememberCoroutineScope()
 
     var previewItem by remember { mutableStateOf<DownloadedMediaEntity?>(null) }
+    var actionSheetItem by remember { mutableStateOf<DownloadedMediaEntity?>(null) }
     var pendingDeleteIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var itemToTag by remember { mutableStateOf<DownloadedMediaEntity?>(null) }
     var showBulkDeleteConfirm by remember { mutableStateOf(false) }
@@ -207,26 +225,14 @@ fun LibraryScreen(
                         }
                     }
                 } else {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 2.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "LIBRARY",
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        StowLavenderBadge(
-                            text = if (state.totalCount > 0) {
-                                "${state.totalCount} SAVED · ${formatBytes(state.totalSizeBytes)}"
-                            } else {
-                                "0 SAVED"
-                            }
-                        )
-                    }
+                    StowCanvasHeader(
+                        title = "LIBRARY",
+                        badgeText = if (state.totalCount > 0) {
+                            "${state.totalCount} SAVED · ${formatBytes(state.totalSizeBytes)}"
+                        } else {
+                            "0 SAVED"
+                        }
+                    )
                 }
             }
 
@@ -400,9 +406,8 @@ fun LibraryScreen(
                     val isVideo = item.mediaType == "VIDEO"
                     val isAudio = item.mediaType == "AUDIO"
                     val isSelected = state.selectedIds.contains(item.id)
-                    var menuExpanded by remember(item.id) { mutableStateOf(false) }
 
-                    // Full-Bleed 4:5 Media Tile (Concept A — Zero Clutter)
+                    // Full-Bleed 4:5 Media Tile
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -449,9 +454,25 @@ fun LibraryScreen(
                                     modifier = Modifier.fillMaxSize(),
                                     contentScale = ContentScale.Crop
                                 )
+                                if (isVideo) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = StowPineDark.copy(alpha = 0.65f),
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .align(Alignment.Center)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.PlayArrow,
+                                            contentDescription = null,
+                                            tint = StowLavender,
+                                            modifier = Modifier.padding(7.dp)
+                                        )
+                                    }
+                                }
                             }
 
-                            // Bottom dark gradient scrim for crisp legibility
+                            // Bottom dark gradient scrim
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -464,80 +485,24 @@ fun LibraryScreen(
                                     )
                             )
 
-                            // Top-left: overflow menu (or favorite dot)
-                            Box(
+                            // Top-left: opens sleek Stow Swiss Action Bottom Sheet
+                            IconButton(
+                                onClick = {
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    actionSheetItem = item
+                                },
                                 modifier = Modifier
                                     .align(Alignment.TopStart)
                                     .padding(6.dp)
+                                    .size(28.dp)
+                                    .background(StowPineDark.copy(alpha = 0.62f), CircleShape)
                             ) {
-                                IconButton(
-                                    onClick = { menuExpanded = true },
-                                    modifier = Modifier
-                                        .size(28.dp)
-                                        .background(StowPineDark.copy(alpha = 0.58f), CircleShape)
-                                ) {
-                                    Icon(
-                                        imageVector = if (item.isFavorite) Icons.Filled.Star else Icons.Default.MoreVert,
-                                        contentDescription = "Options",
-                                        tint = if (item.isFavorite) StowLavender else StowInkOnDark,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                }
-                                DropdownMenu(
-                                    expanded = menuExpanded,
-                                    onDismissRequest = { menuExpanded = false }
-                                ) {
-                                    DropdownMenuItem(
-                                        text = { Text(if (item.isFavorite) "Remove favorite" else "Favorite") },
-                                        onClick = {
-                                            menuExpanded = false
-                                            viewModel.toggleFavorite(item)
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Collection tag") },
-                                        onClick = {
-                                            menuExpanded = false
-                                            itemToTag = item
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Share") },
-                                        onClick = {
-                                            menuExpanded = false
-                                            try {
-                                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                                    type = when {
-                                                        isVideo -> "video/*"
-                                                        isAudio -> "audio/*"
-                                                        else -> "image/*"
-                                                    }
-                                                    putExtra(Intent.EXTRA_STREAM, Uri.parse(item.mediaStoreUri))
-                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                                }
-                                                context.startActivity(Intent.createChooser(shareIntent, "Share Media"))
-                                            } catch (_: Exception) {}
-                                        }
-                                    )
-                                    if (item.sourceUrl.startsWith("http")) {
-                                        DropdownMenuItem(
-                                            text = { Text("Open source link") },
-                                            onClick = {
-                                                menuExpanded = false
-                                                try {
-                                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.sourceUrl)))
-                                                } catch (_: Exception) {}
-                                            }
-                                        )
-                                    }
-                                    DropdownMenuItem(
-                                        text = { Text("Delete", color = ErrorRedDark) },
-                                        onClick = {
-                                            menuExpanded = false
-                                            deleteWithUndo(item)
-                                        }
-                                    )
-                                }
+                                Icon(
+                                    imageVector = if (item.isFavorite) Icons.Filled.Star else Icons.Default.MoreVert,
+                                    contentDescription = "Options",
+                                    tint = if (item.isFavorite) StowLavender else StowInkOnDark,
+                                    modifier = Modifier.size(15.dp)
+                                )
                             }
 
                             // Top-right: Duration / Type badge or Selected check
@@ -606,6 +571,128 @@ fun LibraryScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // Modern Stow Swiss Media Action Bottom Sheet (replaces plain DropdownMenu)
+    actionSheetItem?.let { item ->
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val isVideo = item.mediaType == "VIDEO"
+        val isAudio = item.mediaType == "AUDIO"
+        ModalBottomSheet(
+            onDismissRequest = { actionSheetItem = null },
+            sheetState = sheetState,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            containerColor = StowPineDark
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 22.dp, vertical = 8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    StowLavenderBadge(text = item.platform.ifBlank { item.mediaType })
+                    Text(
+                        text = formatBytes(item.fileSizeBytes),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = StowInkMutedOnDark
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = item.title.ifBlank { item.fileName },
+                    style = MaterialTheme.typography.titleLarge,
+                    color = StowInkOnDark,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (item.creatorHandle.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "@${item.creatorHandle}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = StowInkMutedOnDark
+                    )
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = StowPineMuted)
+
+                ActionSheetRow(
+                    icon = if (item.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                    label = if (item.isFavorite) "Remove from Favorites" else "Add to Favorites",
+                    tint = StowLavender,
+                    onClick = {
+                        viewModel.toggleFavorite(item)
+                        actionSheetItem = null
+                    }
+                )
+                ActionSheetRow(
+                    icon = Icons.Default.Label,
+                    label = if (item.tag.isBlank()) "Add collection tag" else "Edit tag (#${item.tag})",
+                    onClick = {
+                        actionSheetItem = null
+                        itemToTag = item
+                    }
+                )
+                if (item.caption.isNotBlank()) {
+                    ActionSheetRow(
+                        icon = Icons.Default.ContentCopy,
+                        label = "Copy caption",
+                        onClick = {
+                            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                            cm?.setPrimaryClip(ClipData.newPlainText("Caption", item.caption))
+                            actionSheetItem = null
+                            scope.launch { snackbarHostState.showSnackbar("Caption copied") }
+                        }
+                    )
+                }
+                ActionSheetRow(
+                    icon = Icons.Default.Share,
+                    label = "Share media",
+                    onClick = {
+                        actionSheetItem = null
+                        try {
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = when {
+                                    isVideo -> "video/*"
+                                    isAudio -> "audio/*"
+                                    else -> "image/*"
+                                }
+                                putExtra(Intent.EXTRA_STREAM, Uri.parse(item.mediaStoreUri))
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, "Share Media"))
+                        } catch (_: Exception) {}
+                    }
+                )
+                if (item.sourceUrl.startsWith("http")) {
+                    ActionSheetRow(
+                        icon = Icons.Default.OpenInNew,
+                        label = "Open original link",
+                        onClick = {
+                            actionSheetItem = null
+                            try {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.sourceUrl)))
+                            } catch (_: Exception) {}
+                        }
+                    )
+                }
+                ActionSheetRow(
+                    icon = Icons.Default.Delete,
+                    label = "Delete from device",
+                    tint = ErrorRedDark,
+                    onClick = {
+                        actionSheetItem = null
+                        deleteWithUndo(item)
+                    }
+                )
+                Spacer(modifier = Modifier.height(14.dp))
             }
         }
     }
@@ -694,6 +781,27 @@ fun LibraryScreen(
             },
             shape = RoundedCornerShape(22.dp)
         )
+    }
+}
+
+@Composable
+private fun ActionSheetRow(
+    icon: ImageVector,
+    label: String,
+    tint: Color = StowInkOnDark,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+        Spacer(modifier = Modifier.width(14.dp))
+        Text(text = label, style = MaterialTheme.typography.titleMedium, color = tint)
     }
 }
 

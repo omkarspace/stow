@@ -23,6 +23,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -93,6 +94,7 @@ import com.cleansaver.app.ui.theme.StowInkMutedOnDark
 import com.cleansaver.app.ui.theme.StowInkOnDark
 import com.cleansaver.app.ui.theme.StowLavender
 import com.cleansaver.app.ui.theme.StowPineDark
+import com.cleansaver.app.ui.theme.StowPineMuted
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
@@ -205,6 +207,7 @@ class MainActivity : FragmentActivity() {
                             when (tab) {
                                 0 -> HomeScreen(
                                     viewModel = homeViewModel,
+                                    libraryViewModel = libraryViewModel,
                                     snackbarHostState = snackbarHostState,
                                     clipboardSuggestion = clipboardSuggestion,
                                     onUseClipboardSuggestion = { url ->
@@ -216,7 +219,8 @@ class MainActivity : FragmentActivity() {
                                         lastAutoPastedClip = clipboardSuggestion
                                         clipboardSuggestionFlow.value = null
                                     },
-                                    onOpenQueue = { selectedTab = 1 }
+                                    onOpenQueue = { selectedTab = 1 },
+                                    onOpenLibrary = { selectedTab = 2 }
                                 )
                                 1 -> QueueScreen(homeViewModel = homeViewModel)
                                 2 -> {
@@ -335,13 +339,15 @@ private fun StowFloatingBottomBar(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, StowPineMuted.copy(alpha = 0.65f)),
+            shadowElevation = 10.dp
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 StowNavItem(
@@ -353,7 +359,7 @@ private fun StowFloatingBottomBar(
                         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onSelectTab(0)
                     },
-                    modifier = Modifier.weight(if (selectedTab == 0) 1.3f else 1f)
+                    modifier = Modifier.weight(if (selectedTab == 0) 1.55f else 1f)
                 )
                 StowNavItem(
                     label = "QUEUE",
@@ -364,7 +370,7 @@ private fun StowFloatingBottomBar(
                         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onSelectTab(1)
                     },
-                    modifier = Modifier.weight(if (selectedTab == 1) 1.3f else 1f)
+                    modifier = Modifier.weight(if (selectedTab == 1) 1.65f else 1f)
                 )
                 StowNavItem(
                     label = "LIBRARY",
@@ -375,7 +381,7 @@ private fun StowFloatingBottomBar(
                         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onSelectTab(2)
                     },
-                    modifier = Modifier.weight(if (selectedTab == 2) 1.4f else 1f)
+                    modifier = Modifier.weight(if (selectedTab == 2) 1.75f else 1f)
                 )
                 StowNavItem(
                     label = "SETTINGS",
@@ -386,7 +392,7 @@ private fun StowFloatingBottomBar(
                         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onSelectTab(3)
                     },
-                    modifier = Modifier.weight(if (selectedTab == 3) 1.45f else 1f)
+                    modifier = Modifier.weight(if (selectedTab == 3) 1.85f else 1f)
                 )
             }
         }

@@ -32,3 +32,4 @@ Before opening a PR, please keep Stow's non-negotiable rules in mind:
 2. Keep commits focused and clear.
 3. Ensure `./gradlew test` and `./gradlew lint` pass with zero errors.
 4. Open a Pull Request and fill out the PR template.
+

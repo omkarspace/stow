@@ -50,8 +50,8 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.cleansaver.app.data.engine.QueueTask
 import com.cleansaver.app.data.engine.QueueTaskStatus
+import com.cleansaver.app.ui.components.StowCanvasHeader
 import com.cleansaver.app.ui.components.StowDarkBlock
-import com.cleansaver.app.ui.components.StowLavenderBadge
 import com.cleansaver.app.ui.components.StowSegmentedProgressBar
 import com.cleansaver.app.ui.home.HomeViewModel
 import com.cleansaver.app.ui.theme.ErrorRedDark
@@ -85,23 +85,11 @@ fun QueueScreen(
     ) {
         // Lightweight Canvas-Direct Swiss Header
         item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 2.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "QUEUE",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (hasFinished) {
+            StowCanvasHeader(
+                title = "QUEUE",
+                badgeText = if (activeCount > 0) "$activeCount ACTIVE" else "IDLE",
+                trailingAction = if (hasFinished) {
+                    {
                         TextButton(onClick = { homeViewModel.clearCompletedQueue() }) {
                             Text(
                                 text = "CLEAR DONE",
@@ -110,11 +98,8 @@ fun QueueScreen(
                             )
                         }
                     }
-                    StowLavenderBadge(
-                        text = if (activeCount > 0) "$activeCount ACTIVE" else "IDLE"
-                    )
-                }
-            }
+                } else null
+            )
         }
 
         if (tasks.isEmpty()) {
